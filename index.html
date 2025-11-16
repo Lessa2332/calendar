@@ -7,10 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="AR Calendar Adventure: Collect crystals from Ukraine's magical months!">
-  <link rel="manifest" href="manifest.json"> <!-- Optional: Add PWA manifest for better installability -->
   <style>
-    /* Global resets and base styles */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100%;
@@ -19,9 +16,6 @@
       background: #000;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       touch-action: none;
-      -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      user-select: none;
     }
     #mindar-container {
       position: absolute;
@@ -42,7 +36,8 @@
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) 
+                env(safe-area-inset-bottom) env(safe-area-inset-left);
     }
     #info {
       text-align: center;
@@ -56,15 +51,12 @@
       max-width: 90%;
       margin: 0 auto;
       pointer-events: none;
-      transition: opacity 0.3s ease;
     }
     #top-bar {
       display: flex;
       justify-content: space-between;
-      align-items: center;
       padding: 10px 12px;
       gap: 10px;
-      pointer-events: auto;
     }
     .lang-btn, .etsy-btn {
       pointer-events: auto;
@@ -76,11 +68,8 @@
       font-size: 14px;
       cursor: pointer;
       backdrop-filter: blur(4px);
-      transition: background 0.2s ease;
-      user-select: none;
     }
-    .lang-btn:hover, .etsy-btn:hover,
-    .lang-btn:active, .etsy-btn:active {
+    .lang-btn:hover, .etsy-btn:hover {
       background: rgba(0, 200, 255, 0.4);
     }
     #crystals {
@@ -88,8 +77,6 @@
       gap: clamp(8px, 3vw, 14px);
       justify-content: center;
       padding: 0 8px 20px;
-      pointer-events: none;
-      flex-wrap: wrap; /* Better wrapping on very small screens */
     }
     .crystal-slot {
       width: clamp(40px, 12vw, 56px);
@@ -101,525 +88,480 @@
       align-items: center;
       justify-content: center;
       font-size: clamp(24px, 7vw, 36px);
-      font-weight: bold;
       color: white;
-      transition: all 0.3s ease;
-    }
-    .crystal-slot.collected {
-      background: linear-gradient(45deg, #00ffff, #ff00ff);
-      transform: scale(1.1);
-      box-shadow: 0 0 10px #00ffff;
-    }
-    /* Loading spinner */
-    #loading {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: #00ffff;
-      font-size: 18px;
-      z-index: 101;
-      display: none;
-    }
-    .spinner {
-      border: 4px solid rgba(0, 255, 255, 0.3);
-      border-top: 4px solid #00ffff;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 10px;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
     }
   </style>
 </head>
 <body>
-  <div id="loading">
-    <div class="spinner"></div>
-    <div id="loading-text">Loading...</div>
-  </div>
-  <div id="mindar-container"></div>
-  <div id="ui">
-    <div id="top-bar">
-      <button class="lang-btn" id="lang-toggle">Українська</button>
-      <button class="etsy-btn" id="etsy-link">Shop on Etsy</button>
-    </div>
-    <div id="info">Point your camera at any calendar marker ❤️</div>
-    <div id="crystals"></div>
-  </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.10/dist/mindar-target.prod.js"></script>
-  <script type="module">
-    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js';
-    import { MindARThree } from 'https://cdn.jsdelivr.net/npm/mind-ar@1.2.10/dist/mindar-target-three.prod.js';
+<div id="mindar-container"></div>
+<div id="ui">
+  <div id="top-bar">
+    <button class="lang-btn" id="lang-toggle">Українська</button>
+    <button class="etsy-btn" id="etsy-link">Shop on Etsy</button>
+  </div>
+  <div id="info">Point your camera at the calendar marker ❤️</div>
+  <div id="crystals"></div>
+</div>
 
-    // Translations for internationalization
-    const translations = {
-      en: {
-        infoScan: "Point your camera at any calendar marker ❤️",
-        infoComplete: "UKRAINE'S HEART IS COMPLETE!<br>You are a true hero ❤️",
-        langBtn: "Українська",
-        etsyBtn: "Shop on Etsy",
-        loading: "Loading...",
-        scanning: "Scanning for marker...",
-        errorCamera: "❌ Please allow camera access or refresh the page."
-      },
-      uk: {
-        infoScan: "Наведи камеру на будь-який маркер календаря ❤️",
-        infoComplete: "СЕРЦЕ УКРАЇНИ ЗІБРАНО!<br>Ти — справжній герой ❤️",
-        langBtn: "English",
-        etsyBtn: "Купити на Etsy",
-        loading: "Завантажуємо...",
-        scanning: "Шукаємо маркер...",
-        errorCamera: "❌ Дозволь доступ до камери або онови сторінку."
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.10/dist/mindar-target.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.10/dist/mindar-target-three.prod.js"></script>
+
+<script>
+// === Мови ===
+const translations = {
+  en: {
+    infoScan: "Point your camera at the calendar marker ❤️",
+    infoComplete: "UKRAINE'S HEART IS COMPLETE!<br>You are a true hero ❤️",
+    langBtn: "Українська",
+    etsyBtn: "Shop on Etsy"
+  },
+  uk: {
+    infoScan: "Наведи камеру на маркер календаря ❤️",
+    infoComplete: "СЕРЦЕ УКРАЇНИ ЗІБРАНО!<br>Ти — справжній герой ❤️",
+    langBtn: "English",
+    etsyBtn: "Купити на Etsy"
+  }
+};
+
+let currentLang = 'en';
+const DPR = window.devicePixelRatio || 1;
+
+// === Локалізація ===
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('calendar-lang', lang);
+  const t = translations[lang];
+  document.getElementById('info').innerHTML = t.infoScan;
+  document.getElementById('lang-toggle').textContent = t.langBtn;
+  document.getElementById('etsy-link').textContent = t.etsyBtn;
+  updateCrystalsUI();
+}
+
+// Ініціалізація мови
+const savedLang = localStorage.getItem('calendar-lang');
+if (savedLang === 'uk') setLang('uk');
+
+// === Події кнопок ===
+document.getElementById('lang-toggle').addEventListener('click', () => {
+  setLang(currentLang === 'en' ? 'uk' : 'en');
+});
+document.getElementById('etsy-link').addEventListener('click', () => {
+  window.open('https://smartlessa.etsy.com', '_blank');
+});
+
+// === Дані ===
+let collectedCrystals = JSON.parse(localStorage.getItem('ua-crystals2026') || '[]');
+const totalMonths = 12;
+
+// === MindAR ===
+const mindarThree = new MindARThree.Target({
+  container: document.getElementById('mindar-container'),
+  imageTargetSrc: 'calendar.mind',
+  maxTrack: 1,
+  uiScanning: currentLang === 'uk' ? "Шукаємо маркер..." : "Scanning for marker...",
+  uiLoading: currentLang === 'uk' ? "Завантажуємо..." : "Loading...",
+  filterMinCF: 0.0001,
+  filterBeta: 0.0001
+});
+
+const { renderer, scene, camera } = mindarThree;
+renderer.setPixelRatio(DPR);
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+// Світло
+const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5);
+directionalLight.position.set(5, 10, 7);
+scene.add(directionalLight);
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+
+// Один AR група для маркера
+const arGroup = new THREE.Group();
+const targetGroup = mindarThree.addAnchor(0);
+targetGroup.group.add(arGroup);
+
+// Змінні для крапель та калюжі
+let drops = [];
+let puddle = null;
+let dropInterval = null;
+let isPuddleActive = false;
+
+// Ресайз
+function onWindowResize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', onWindowResize, { passive: true });
+window.addEventListener('orientationchange', () => setTimeout(onWindowResize, 300));
+
+// Уніфікований тач
+const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+function addUnifiedTouch(el, onStart, onMove, onEnd) {
+  if (isMobile) {
+    el.addEventListener('touchstart', e => { e.preventDefault(); onStart(e.touches[0]); }, { passive: false });
+    el.addEventListener('touchmove', e => { e.preventDefault(); onMove(e.touches[0]); }, { passive: false });
+    el.addEventListener('touchend', e => { e.preventDefault(); onEnd(); }, { passive: false });
+  } else {
+    el.addEventListener('mousedown', e => onStart(e));
+    el.addEventListener('mousemove', e => { if (el.dragging) onMove(e); });
+    el.addEventListener('mouseup', onEnd);
+    el.addEventListener('mouseleave', onEnd);
+  }
+}
+
+// Шейдер для краплі з рефракцією
+const dropVertexShader = `
+  varying vec3 vNormal;
+  varying vec3 vViewPosition;
+  void main() {
+    vNormal = normalize(normalMatrix * normal);
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    vViewPosition = -mvPosition.xyz;
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`;
+
+const dropFragmentShader = `
+  uniform float time;
+  varying vec3 vNormal;
+  varying vec3 vViewPosition;
+  
+  void main() {
+    vec3 normal = normalize(vNormal);
+    vec3 viewDir = normalize(vViewPosition);
+    
+    // Рефракція
+    float fresnel = pow(1.0 - max(dot(viewDir, normal), 0.0), 3.0);
+    
+    // Колір води з легким блакитним відтінком
+    vec3 waterColor = vec3(0.4, 0.6, 0.9);
+    vec3 refractColor = mix(waterColor, vec3(1.0), fresnel * 0.3);
+    
+    // Додаємо динамічні відблиски
+    float sparkle = sin(time * 5.0 + vViewPosition.x * 10.0) * 0.2 + 0.8;
+    
+    gl_FragColor = vec4(refractColor * sparkle, 0.9 - fresnel * 0.3);
+  }
+`;
+
+// Шейдер для калюжі з хвилями
+const puddleVertexShader = `
+  uniform float time;
+  uniform vec2 touchPoint;
+  uniform float touchStrength;
+  varying vec2 vUv;
+  
+  void main() {
+    vUv = uv;
+    
+    vec3 newPosition = position;
+    
+    // Генерація хвиль від торкання
+    if (touchStrength > 0.0) {
+      float dist = distance(uv, touchPoint);
+      float wave = exp(-dist * 10.0) * sin(dist * 20.0 - time * 8.0) * touchStrength;
+      newPosition.z += wave * 0.1;
+    }
+    
+    // Легка ряб від часу
+    float ripple = sin(time * 2.0 + uv.x * 15.0) * sin(time * 1.7 + uv.y * 12.0) * 0.01;
+    newPosition.z += ripple;
+    
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+  }
+`;
+
+const puddleFragmentShader = `
+  uniform float time;
+  uniform vec2 touchPoint;
+  uniform float touchStrength;
+  varying vec2 vUv;
+  
+  void main() {
+    // Основний колір калюжі
+    vec3 baseColor = vec3(0.2, 0.4, 0.8);
+    
+    // Відблиски
+    float shine = sin(time * 3.0 + vUv.x * 8.0) * 0.1 + 0.9;
+    
+    // Кільця хвиль від торкання
+    float waveRing = 0.0;
+    if (touchStrength > 0.0) {
+      float dist = distance(vUv, touchPoint);
+      waveRing = sin(dist * 30.0 - time * 10.0) * touchStrength * exp(-dist * 8.0);
+    }
+    
+    // Текстура води
+    float waterPattern = sin(time + vUv.x * 20.0) * sin(time * 1.3 + vUv.y * 18.0) * 0.1;
+    
+    vec3 finalColor = baseColor * shine + vec3(0.3, 0.5, 0.9) * waveRing + waterPattern;
+    float alpha = 0.7 + waveRing * 0.3;
+    
+    gl_FragColor = vec4(finalColor, alpha);
+  }
+`;
+
+// Функція створення краплі
+function createDrop() {
+  const geometry = new THREE.SphereGeometry(0.05, 16, 16);
+  const material = new THREE.ShaderMaterial({
+    vertexShader: dropVertexShader,
+    fragmentShader: dropFragmentShader,
+    uniforms: {
+      time: { value: 0 }
+    },
+    transparent: true,
+    side: THREE.DoubleSide
+  });
+
+  const drop = new THREE.Mesh(geometry, material);
+  
+  // Випадкова позиція згори
+  drop.position.set(
+    (Math.random() - 0.5) * 1.5,
+    1.5,
+    (Math.random() - 0.5) * 1.5
+  );
+  
+  drop.userData = {
+    velocity: 0,
+    speed: 0.02 + Math.random() * 0.01
+  };
+  
+  arGroup.add(drop);
+  drops.push(drop);
+  
+  return drop;
+}
+
+// Функція створення калюжі
+function createPuddle() {
+  const geometry = new THREE.PlaneGeometry(2, 2, 32, 32);
+  const material = new THREE.ShaderMaterial({
+    vertexShader: puddleVertexShader,
+    fragmentShader: puddleFragmentShader,
+    uniforms: {
+      time: { value: 0 },
+      touchPoint: { value: new THREE.Vector2(0.5, 0.5) },
+      touchStrength: { value: 0 }
+    },
+    transparent: true,
+    side: THREE.DoubleSide
+  });
+
+  puddle = new THREE.Mesh(geometry, material);
+  puddle.rotation.x = -Math.PI / 2;
+  puddle.position.y = 0.01;
+  
+  arGroup.add(puddle);
+  isPuddleActive = true;
+  
+  return puddle;
+}
+
+// Анімація крапель
+function animateDrops() {
+  const currentTime = Date.now() * 0.001;
+  
+  // Оновлюємо краплі
+  for (let i = drops.length - 1; i >= 0; i--) {
+    const drop = drops[i];
+    drop.userData.velocity += drop.userData.speed;
+    drop.position.y -= drop.userData.velocity;
+    
+    // Оновлюємо час у шейдері
+    drop.material.uniforms.time.value = currentTime;
+    
+    // Перевіряємо чи крапля впала
+    if (drop.position.y <= 0.05) {
+      // Видаляємо краплю
+      arGroup.remove(drop);
+      drops.splice(i, 1);
+      
+      // Створюємо калюжу якщо ще немає
+      if (!isPuddleActive) {
+        createPuddle();
       }
-    };
-    let currentLang = 'en';
-    const DPR = window.devicePixelRatio || 1;
-
-    // Localization function
-    function setLang(lang) {
-      currentLang = lang;
-      localStorage.setItem('calendar-lang', lang);
-      const t = translations[lang];
-      document.getElementById('info').innerHTML = t.infoScan;
-      document.getElementById('lang-toggle').textContent = t.langBtn;
-      document.getElementById('etsy-link').textContent = t.etsyBtn;
-      document.getElementById('loading-text').textContent = t.loading;
-      updateCrystalsUI();
     }
-
-    // Initialize language
-    const savedLang = localStorage.getItem('calendar-lang');
-    if (savedLang === 'uk') setLang('uk');
-
-    // Event listeners for buttons
-    document.getElementById('lang-toggle').addEventListener('click', () => {
-      setLang(currentLang === 'en' ? 'uk' : 'en');
-    });
-    document.getElementById('etsy-link').addEventListener('click', () => {
-      window.open('https://smartlessa.etsy.com', '_blank');
-    });
-
-    // Data management
-    let collectedCrystals = JSON.parse(localStorage.getItem('ua-crystals2026') || '[]');
-    const totalMonths = 12;
-    const images = [];
-    let allImagesLoaded = false;
-
-    // Preload images
-    for (let i = 1; i <= 12; i++) {
-      const img = new Image();
-      img.src = `images/${i.toString().padStart(2, '0')}.jpg`;
-      img.onload = () => {
-        if (++loadedImagesCount === totalMonths) allImagesLoaded = true;
-      };
-      images.push(img);
+  }
+  
+  // Оновлюємо калюжу
+  if (puddle) {
+    puddle.material.uniforms.time.value = currentTime;
+    
+    // Зменшуємо силу торкання з часом
+    if (puddle.material.uniforms.touchStrength.value > 0) {
+      puddle.material.uniforms.touchStrength.value *= 0.95;
+      if (puddle.material.uniforms.touchStrength.value < 0.01) {
+        puddle.material.uniforms.touchStrength.value = 0;
+      }
     }
-    let loadedImagesCount = 0;
+  }
+}
 
-    // MindAR setup
-    const mindarThree = new MindARThree({
-      container: document.getElementById('mindar-container'),
-      imageTargetSrc: 'calendar.mind',
-      maxTrack: 12,
-      uiScanningText: translations[currentLang].scanning || "Scanning for marker...",
-      uiLoadingText: translations[currentLang].loading || "Loading...",
-      warmupTolerance: 3
-    });
-    const { renderer, scene, camera } = mindarThree;
-    renderer.setPixelRatio(DPR);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true; // Enable shadows for better visuals
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// Обробка торкання калюжі
+function handlePuddleTouch(touch) {
+  if (!puddle || !isPuddleActive) return;
+  
+  const rect = renderer.domElement.getBoundingClientRect();
+  const x = ((touch.clientX - rect.left) / rect.width);
+  const y = 1 - ((touch.clientY - rect.top) / rect.height);
+  
+  // Оновлюємо точку торкання в шейдері
+  puddle.material.uniforms.touchPoint.value.set(x, y);
+  puddle.material.uniforms.touchStrength.value = 1.0;
+}
 
-    // Lighting setup
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5);
-    directionalLight.position.set(0, 1, 1);
-    directionalLight.castShadow = true;
-    scene.add(directionalLight);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-
-    // AR groups for each target
-    const arGroups = [];
-    for (let i = 0; i < 12; i++) {
-      const group = new THREE.Group();
-      const targetGroup = mindarThree.addTargetGroup(i, 1);
-      targetGroup.add(group);
-      arGroups.push(group);
+// === Запуск AR ===
+mindarThree.start().then(() => {
+  let isVisible = false;
+  
+  // Запускаємо генерацію крапель
+  dropInterval = setInterval(() => {
+    if (isVisible && drops.length < 15) {
+      createDrop();
     }
-
-    // Resize handler
-    function onWindowResize() {
-      const w = window.innerWidth, h = window.innerHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-    }
-    window.addEventListener('resize', onWindowResize, { passive: true });
-    window.addEventListener('orientationchange', () => setTimeout(onWindowResize, 300));
-
-    // Unified touch/mouse handler (improved for better compatibility)
-    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-    let dragging = false;
-    function addUnifiedTouch(el, onStart, onMove = () => {}, onEnd = () => {}) {
-      const startHandler = (e) => {
-        e.preventDefault();
-        dragging = true;
-        const touch = isMobile ? e.touches[0] : e;
-        onStart(touch);
-      };
-      const moveHandler = (e) => {
-        if (!dragging) return;
-        e.preventDefault();
-        const touch = isMobile ? e.touches[0] : e;
-        onMove(touch);
-      };
-      const endHandler = (e) => {
-        e.preventDefault();
-        dragging = false;
-        onEnd();
-      };
-
-      if (isMobile) {
-        el.addEventListener('touchstart', startHandler, { passive: false });
-        el.addEventListener('touchmove', moveHandler, { passive: false });
-        el.addEventListener('touchend', endHandler, { passive: false });
-        el.addEventListener('touchcancel', endHandler, { passive: false });
+  }, 500);
+  
+  const animate = () => {
+    renderer.render(scene, camera);
+    const currentVisible = targetGroup.visible;
+    
+    if (currentVisible !== isVisible) {
+      if (!currentVisible) {
+        // Маркер втрачено - очищаємо сцену
+        arGroup.clear();
+        drops = [];
+        puddle = null;
+        isPuddleActive = false;
       } else {
-        el.addEventListener('mousedown', startHandler);
-        el.addEventListener('mousemove', moveHandler);
-        el.addEventListener('mouseup', endHandler);
-        el.addEventListener('mouseleave', endHandler);
+        // Маркер знайдено - запускаємо анімацію
+        isPuddleActive = false;
       }
+      isVisible = currentVisible;
     }
-
-    // Haptic feedback for mobile
-    function hapticFeedback(pattern = [100]) {
-      if (isMobile && navigator.vibrate) {
-        navigator.vibrate(pattern);
-      }
+    
+    // Анімуємо краплі та калюжу
+    if (isVisible) {
+      animateDrops();
     }
+    
+    requestAnimationFrame(animate);
+  };
+  
+  // Додаємо обробку торкання для калюжі
+  addUnifiedTouch(renderer.domElement, 
+    (touch) => { handlePuddleTouch(touch); },
+    () => {},
+    () => {}
+  );
+  
+  animate();
+}).catch(e => {
+  document.getElementById('info').innerHTML = currentLang === 'uk' 
+    ? "❌ Дозволь доступ до камери або онови сторінку." 
+    : "❌ Please allow camera access or refresh the page.";
+  console.error("AR initialization failed:", e);
+});
 
-    // Start AR
-    const loadingEl = document.getElementById('loading');
-    loadingEl.style.display = 'block';
-    mindarThree.start().then(() => {
-      loadingEl.style.display = 'none';
-      let lastVisible = -1;
-      const clock = new THREE.Clock(); // For time-based animations
+// Функція для показу кристала
+function showCrystalReward() {
+  const month = 0; // Для одного маркера
+  
+  if (collectedCrystals.includes(month)) return;
+  collectedCrystals.push(month);
+  localStorage.setItem('ua-crystals2026', JSON.stringify(collectedCrystals));
+  updateCrystalsUI();
 
-      const animate = () => {
-        const delta = clock.getDelta();
-        renderer.render(scene, camera);
-        let currentVisible = -1;
-        for (let i = 0; i < 12; i++) {
-          if (mindarThree.targetGroups[i].visible) {
-            currentVisible = i;
-            break;
-          }
-        }
-        if (currentVisible !== lastVisible) {
-          if (lastVisible !== -1) arGroups[lastVisible].clear();
-          if (currentVisible !== -1 && allImagesLoaded) {
-            setTimeout(() => showMonthContent(currentVisible, arGroups[currentVisible]), 300);
-          }
-          lastVisible = currentVisible;
-        }
-        requestAnimationFrame(animate);
-      };
-      animate();
-    }).catch(e => {
-      loadingEl.style.display = 'none';
-      document.getElementById('info').innerHTML = translations[currentLang].errorCamera;
-      console.error('AR Error:', e);
-    });
+  // Зупиняємо краплі
+  clearInterval(dropInterval);
+  drops.forEach(drop => arGroup.remove(drop));
+  drops = [];
+  if (puddle) arGroup.remove(puddle);
+  isPuddleActive = false;
 
-    // Main mechanics
-    function showMonthContent(month, arGroup) {
-      if (collectedCrystals.includes(month)) {
-        showCrystalReward(month, arGroup);
-        return;
-      }
-      const img = images[month];
-      if (!img.complete) {
-        img.onload = () => showMonthContent(month, arGroup);
-        return;
-      }
-      arGroup.clear();
-      const texture = new THREE.Texture(img);
-      texture.needsUpdate = true;
-      const aspect = img.width / img.height;
-      const size = Math.min(1.8, window.innerWidth / 800 * 1.8);
-      const geo = new THREE.PlaneGeometry(size, size / aspect);
-      const frostMaterial = new THREE.ShaderMaterial({
-        uniforms: { 
-          time: { value: 0 }, 
-          melt: { value: 0 }, 
-          tex: { value: texture } 
-        },
-        vertexShader: `
-          varying vec2 vUv; 
-          void main() { 
-            vUv = uv; 
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); 
-          }
-        `,
-        fragmentShader: `
-          uniform float time; 
-          uniform float melt; 
-          uniform sampler2D tex;
-          varying vec2 vUv;
-          float noise(vec2 p) { 
-            return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); 
-          }
-          void main() {
-            float n = noise(vUv * 12.0 + time * 0.1);
-            float ice = smoothstep(0.45, 0.55, n) * (1.0 - melt);
-            vec3 col = mix(texture2D(tex, vUv).rgb, vec3(0.9, 0.95, 1.0), ice * 0.7);
-            gl_FragColor = vec4(col, 1.0 - melt * 0.5);
-          }
-        `,
-        transparent: true
-      });
-      const frost = new THREE.Mesh(geo, frostMaterial);
-      frost.position.z = 0.01;
-      arGroup.add(frost);
+  arGroup.clear();
+  const colors = ['#00ffff','#ff00ff','#00ff00','#ffff00','#ff8800','#ff0066','#0066ff','#ff3399','#33ff99','#ffcc00','#cc00ff','#00ccff'];
+  const crystal = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.35, 1),
+    new THREE.MeshStandardMaterial({
+      color: colors[month],
+      emissive: colors[month],
+      emissiveIntensity: 4,
+      roughness: 0,
+      metalness: 0.85
+    })
+  );
+  crystal.position.z = 0.2;
+  arGroup.add(crystal);
 
-      // Animate melting on touch
-      let meltInterval;
-      const startMelting = () => {
-        hapticFeedback([50]); // Short vibe
-        if (meltInterval) clearInterval(meltInterval);
-        meltInterval = setInterval(() => {
-          frostMaterial.uniforms.melt.value += 0.03;
-          if (frostMaterial.uniforms.melt.value >= 1) {
-            clearInterval(meltInterval);
-            showPuzzle(month, texture, arGroup, size, size / aspect);
-          }
-        }, 40);
-      };
+  const animateCrystal = () => {
+    if (!arGroup.parent) return;
+    crystal.rotation.y += 0.015;
+    crystal.scale.setScalar(1 + Math.sin(Date.now()*0.004)*0.08);
+    requestAnimationFrame(animateCrystal);
+  };
+  animateCrystal();
 
-      // Add touch listener only for melting (no move/end needed)
-      addUnifiedTouch(renderer.domElement, startMelting);
-
-      // Animate frost shimmer
-      const animateFrost = () => {
-        if (arGroup.children.includes(frost)) {
-          frostMaterial.uniforms.time.value += 0.05;
-          requestAnimationFrame(animateFrost);
-        }
-      };
-      animateFrost();
+  // Для одного маркера - одразу показуємо серце
+  setTimeout(() => {
+    arGroup.clear();
+    const heart = new THREE.Group();
+    const geo = new THREE.BufferGeometry();
+    const vertices = [];
+    const c = Math.random() > 0.5 ? 0x0057b7 : 0xffd700;
+    for (let i = 0; i < 2500; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.random() * 1.2;
+      vertices.push(Math.cos(a)*r, Math.sin(a)*r + (Math.random()-0.5)*0.3, (Math.random()-0.5)*0.3);
     }
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: c,
+      size: window.innerWidth > 600 ? 0.05 : 0.03,
+      transparent: true,
+      opacity: 0.95
+    }));
+    heart.add(pts);
+    arGroup.add(heart);
+    document.getElementById('info').innerHTML = translations[currentLang].infoComplete;
+  }, 2000);
+}
 
-    function showPuzzle(month, baseTexture, arGroup, width, height) {
-      arGroup.clear();
-      const pieces = [];
-      const grid = 3;
-      const sizeW = width / grid;
-      const sizeH = height / grid;
+function updateCrystalsUI() {
+  const container = document.getElementById('crystals');
+  container.innerHTML = '';
+  for (let i = 0; i < totalMonths; i++) {
+    const div = document.createElement('div');
+    div.className = 'crystal-slot';
+    div.innerHTML = collectedCrystals.includes(i) ? '✦' : (i+1);
+    div.style.background = collectedCrystals.includes(i) 
+      ? 'linear-gradient(45deg, #00ffff, #ff00ff)' 
+      : 'rgba(0,0,0,0.7)';
+    container.appendChild(div);
+  }
+}
 
-      // Create puzzle pieces
-      for (let y = 0; y < grid; y++) {
-        for (let x = 0; x < grid; x++) {
-          const canvas = document.createElement('canvas');
-          canvas.width = canvas.height = 512;
-          const ctx = canvas.getContext('2d');
-          ctx.imageSmoothingEnabled = true;
-          ctx.drawImage(baseTexture.image,
-            x * baseTexture.image.width / grid, y * baseTexture.image.height / grid,
-            baseTexture.image.width / grid, baseTexture.image.height / grid,
-            0, 0, 512, 512
-          );
-          const tex = new THREE.CanvasTexture(canvas);
-          tex.needsUpdate = true;
-          const mesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(sizeW * 0.95, sizeH * 0.95),
-            new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.85 })
-          );
-          const posX = (x - grid / 2 + 0.5) * sizeW + (Math.random() - 0.5) * sizeW * 1.5;
-          const posY = (grid / 2 - y - 0.5) * sizeH + (Math.random() - 0.5) * sizeH * 1.5;
-          mesh.position.set(posX, posY, 0.02);
-          mesh.userData = { 
-            correctX: (x - grid / 2 + 0.5) * sizeW, 
-            correctY: (grid / 2 - y - 0.5) * sizeH,
-            originalX: posX,
-            originalY: posY
-          };
-          arGroup.add(mesh);
-          pieces.push(mesh);
-        }
-      }
-
-      let selectedPiece = null;
-      const raycaster = new THREE.Raycaster();
-
-      const onTouchStart = (touch) => {
-        const rect = renderer.domElement.getBoundingClientRect();
-        const x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
-        const y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
-        raycaster.setFromCamera(new THREE.Vector2(x, y), camera);
-        const intersects = raycaster.intersectObjects(pieces);
-        if (intersects.length > 0) {
-          selectedPiece = intersects[0].object;
-          hapticFeedback([30]);
-          selectedPiece.userData.startPos = selectedPiece.position.clone();
-        }
-      };
-
-      const onTouchMove = (touch) => {
-        if (!selectedPiece) return;
-        const rect = renderer.domElement.getBoundingClientRect();
-        const x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
-        const y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
-        const v = new THREE.Vector3(x, y, 0.5).unproject(camera);
-        selectedPiece.position.x = v.x;
-        selectedPiece.position.y = v.y;
-      };
-
-      const onTouchEnd = () => {
-        if (!selectedPiece) return;
-        const { correctX, correctY } = selectedPiece.userData;
-        const dist = Math.hypot(
-          selectedPiece.position.x - correctX, 
-          selectedPiece.position.y - correctY
-        );
-        const tolerance = Math.max(sizeW, sizeH) * 0.4;
-        if (dist < tolerance) {
-          // Snap to position
-          selectedPiece.position.set(correctX, correctY, 0.02);
-          selectedPiece.material.opacity = 1;
-          hapticFeedback([100, 50]); // Success vibe
-          const index = pieces.indexOf(selectedPiece);
-          if (index > -1) pieces.splice(index, 1);
-          if (pieces.length === 0) {
-            setTimeout(() => showCrystalReward(month, arGroup), 500);
-          }
-        } else {
-          // Animate back to start (smoother easing)
-          const { originalX, originalY } = selectedPiece.userData;
-          let f = 0;
-          const animBack = () => {
-            f += 0.1;
-            if (f <= 1) {
-              const ease = 1 - Math.pow(1 - f, 3); // Ease out cubic
-              selectedPiece.position.x = selectedPiece.userData.startPos.x + (originalX - selectedPiece.userData.startPos.x) * ease;
-              selectedPiece.position.y = selectedPiece.userData.startPos.y + (originalY - selectedPiece.userData.startPos.y) * ease;
-              requestAnimationFrame(animBack);
-            }
-          };
-          animBack();
-        }
-        selectedPiece = null;
-      };
-
-      addUnifiedTouch(renderer.domElement, onTouchStart, onTouchMove, onTouchEnd);
+// Додаємо обробник для активації кристала при довгому торканні калюжі
+let touchStartTime = 0;
+addUnifiedTouch(renderer.domElement, 
+  (touch) => { 
+    touchStartTime = Date.now();
+    handlePuddleTouch(touch);
+  },
+  () => {},
+  () => {
+    if (Date.now() - touchStartTime > 1000) { // Довге торкання > 1 секунди
+      showCrystalReward();
     }
+  }
+);
 
-    function showCrystalReward(month, arGroup) {
-      if (collectedCrystals.includes(month)) return;
-      collectedCrystals.push(month);
-      localStorage.setItem('ua-crystals2026', JSON.stringify(collectedCrystals));
-      updateCrystalsUI();
-      arGroup.clear();
+updateCrystalsUI();
+</script>
 
-      // Crystal colors (one per month)
-      const colors = ['#00ffff', '#ff00ff', '#00ff00', '#ffff00', '#ff8800', '#ff0066', '#0066ff', '#ff3399', '#33ff99', '#ffcc00', '#cc00ff', '#00ccff'];
-      const crystalGeo = new THREE.IcosahedronGeometry(0.35, 1);
-      const crystalMat = new THREE.MeshStandardMaterial({
-        color: colors[month],
-        emissive: colors[month],
-        emissiveIntensity: 4,
-        roughness: 0,
-        metalness: 0.85
-      });
-      const crystal = new THREE.Mesh(crystalGeo, crystalMat);
-      crystal.position.z = 0.2;
-      crystal.castShadow = true;
-      crystal.receiveShadow = true;
-      arGroup.add(crystal);
-
-      // Animate crystal
-      const animateCrystal = () => {
-        if (!arGroup.parent) return;
-        crystal.rotation.y += 0.015;
-        crystal.rotation.x += 0.005;
-        const scale = 1 + Math.sin(Date.now() * 0.004) * 0.08;
-        crystal.scale.setScalar(scale);
-        requestAnimationFrame(animateCrystal);
-      };
-      animateCrystal();
-      hapticFeedback([200]); // Reward vibe
-
-      // Complete heart if all collected
-      if (collectedCrystals.length === 12) {
-        setTimeout(() => {
-          arGroup.clear();
-          const heart = new THREE.Group();
-          const geo = new THREE.BufferGeometry();
-          const vertices = [];
-          const heartColor = Math.random() > 0.5 ? 0x0057b7 : 0xffd700; // Blue or gold
-          for (let i = 0; i < 2500; i++) {
-            const a = Math.random() * Math.PI * 2;
-            const r = Math.random() * 1.2;
-            // Better heart shape approximation
-            const heartX = Math.cos(a) * r * (Math.sin(a) * Math.abs(Math.sin(a)) + 1);
-            const heartY = -Math.abs(Math.sin(a)) * r;
-            vertices.push(
-              heartX * 0.8, 
-              heartY * 0.8 + (Math.random() - 0.5) * 0.3, 
-              (Math.random() - 0.5) * 0.3
-            );
-          }
-          geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-          const pointsMaterial = new THREE.PointsMaterial({
-            color: heartColor,
-            size: window.innerWidth > 600 ? 0.05 : 0.03,
-            transparent: true,
-            opacity: 0.95,
-            blending: THREE.AdditiveBlending // Glow effect
-          });
-          const pts = new THREE.Points(geo, pointsMaterial);
-          heart.add(pts);
-          arGroup.add(heart);
-
-          // Animate particles
-          const animateHeart = () => {
-            if (!arGroup.parent) return;
-            pts.rotation.y += 0.005;
-            pts.material.opacity = 0.95 + Math.sin(Date.now() * 0.003) * 0.05;
-            requestAnimationFrame(animateHeart);
-          };
-          animateHeart();
-
-          document.getElementById('info').innerHTML = translations[currentLang].infoComplete;
-          hapticFeedback([300, 100, 300]); // Victory vibe
-        }, 2000);
-      }
-    }
-
-    function updateCrystalsUI() {
-      const container = document.getElementById('crystals');
-      container.innerHTML = '';
-      for (let i = 0; i < totalMonths; i++) {
-        const div = document.createElement('div');
-        div.className = 'crystal-slot';
-        if (collectedCrystals.includes(i)) {
-          div.innerHTML = '✦';
-          div.classList.add('collected');
-        } else {
-          div.innerHTML = (i + 1);
-        }
-        container.appendChild(div);
-      }
-    }
-
-    // Initial UI update
-    updateCrystalsUI();
-  </script>
 </body>
 </html>
