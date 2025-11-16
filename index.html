@@ -177,6 +177,13 @@
     let collectedCrystals = JSON.parse(localStorage.getItem('ua-crystals2026') || '[]');
     const totalMonths = 12;
 
+    // Функція для показу помилок
+    function showError(message) {
+      document.getElementById('info').innerHTML = message;
+      document.getElementById('loading').style.display = 'none';
+      console.error('AR Error:', message);
+    }
+
     // Функції інтерфейсу
     function setLang(lang) {
       currentLang = lang;
@@ -228,7 +235,7 @@
       }
 
       if (typeof MindARThree === 'undefined') {
-        showError('MindAR not loaded');
+        showError('MindAR not loaded. Available globals:', Object.keys(window));
         return;
       }
 
@@ -390,11 +397,6 @@
           }
         }
 
-        function showError(message) {
-          document.getElementById('info').innerHTML = message;
-          document.getElementById('loading').style.display = 'none';
-        }
-
       } catch (error) {
         console.error('AR initialization error:', error);
         showError(translations[currentLang].errorLibrary);
@@ -404,7 +406,7 @@
     // Запускаємо AR після завантаження сторінки
     window.addEventListener('load', function() {
       console.log('Page loaded, starting AR...');
-      setTimeout(initializeAR, 1000); // Невелика затримка для стабільності
+      setTimeout(initializeAR, 1000);
     });
 
     // Оновлюємо UI
