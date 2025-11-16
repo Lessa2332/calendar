@@ -9,7 +9,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="description" content="AR Calendar Adventure: Collect crystals from Ukraine's magical months!">
   <style>
-    /* Global resets and base styles */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100%;
@@ -55,7 +54,6 @@
       max-width: 90%;
       margin: 0 auto;
       pointer-events: none;
-      transition: opacity 0.3s ease;
     }
     #top-bar {
       display: flex;
@@ -75,12 +73,6 @@
       font-size: 14px;
       cursor: pointer;
       backdrop-filter: blur(4px);
-      transition: background 0.2s ease;
-      user-select: none;
-    }
-    .lang-btn:hover, .etsy-btn:hover,
-    .lang-btn:active, .etsy-btn:active {
-      background: rgba(0, 200, 255, 0.4);
     }
     #crystals {
       display: flex;
@@ -109,7 +101,6 @@
       transform: scale(1.1);
       box-shadow: 0 0 10px #00ffff;
     }
-    /* Loading spinner */
     #loading {
       position: absolute;
       top: 50%;
@@ -138,7 +129,7 @@
 <body>
   <div id="loading">
     <div class="spinner"></div>
-    <div id="loading-text">Loading...</div>
+    <div id="loading-text">Loading AR Experience...</div>
   </div>
   <div id="mindar-container"></div>
   <div id="ui">
@@ -150,39 +141,43 @@
     <div id="crystals"></div>
   </div>
 
-  <!-- Використовуємо правильні CDN посилання -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.min.js"></script>
+  <!-- Завантажуємо Three.js першим -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Потім MindAR -->
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.10/dist/mindar-image-three.prod.js"></script>
 
   <script>
-    // Translations for internationalization
+    console.log('Script started...');
+    console.log('THREE available:', typeof THREE !== 'undefined');
+    console.log('MindARThree available:', typeof MindARThree !== 'undefined');
+
+    // Прості переклади
     const translations = {
       en: {
         infoScan: "Point your camera at any calendar marker ❤️",
-        infoComplete: "UKRAINE'S HEART IS COMPLETE!<br>You are a true hero ❤️",
+        infoComplete: "🎉 CONGRATULATIONS! All crystals collected!",
         langBtn: "Українська",
         etsyBtn: "Shop on Etsy",
-        loading: "Loading...",
-        scanning: "Scanning for marker...",
-        errorCamera: "❌ Please allow camera access or refresh the page.",
-        errorLibrary: "❌ AR library failed to load. Please refresh."
+        loading: "Loading AR Experience...",
+        errorCamera: "❌ Please allow camera access",
+        errorLibrary: "❌ AR not supported"
       },
       uk: {
         infoScan: "Наведи камеру на будь-який маркер календаря ❤️",
-        infoComplete: "СЕРЦЕ УКРАЇНИ ЗІБРАНО!<br>Ти — справжній герой ❤️",
+        infoComplete: "🎉 ВІТАЮ! Всі кристали зібрані!",
         langBtn: "English",
         etsyBtn: "Купити на Etsy",
-        loading: "Завантажуємо...",
-        scanning: "Шукаємо маркер...",
-        errorCamera: "❌ Дозволь доступ до камери або онови сторінку.",
-        errorLibrary: "❌ Помилка завантаження AR. Оновіть сторінку."
+        loading: "Завантажуємо AR...",
+        errorCamera: "❌ Дозволь доступ до камери",
+        errorLibrary: "❌ AR не підтримується"
       }
     };
 
     let currentLang = 'en';
-    const DPR = window.devicePixelRatio || 1;
+    let collectedCrystals = JSON.parse(localStorage.getItem('ua-crystals2026') || '[]');
+    const totalMonths = 12;
 
-    // Localization function
+    // Функції інтерфейсу
     function setLang(lang) {
       currentLang = lang;
       localStorage.setItem('calendar-lang', lang);
@@ -193,290 +188,6 @@
       document.getElementById('loading-text').textContent = t.loading;
       updateCrystalsUI();
     }
-
-    // Initialize language
-    const savedLang = localStorage.getItem('calendar-lang');
-    if (savedLang === 'uk') setLang('uk');
-
-    // Event listeners for buttons
-    document.getElementById('lang-toggle').addEventListener('click', () => {
-      setLang(currentLang === 'en' ? 'uk' : 'en');
-    });
-    document.getElementById('etsy-link').addEventListener('click', () => {
-      window.open('https://smartlessa.etsy.com', '_blank');
-    });
-
-    // Data management
-    let collectedCrystals = JSON.parse(localStorage.getItem('ua-crystals2026') || '[]');
-    const totalMonths = 12;
-    const images = [];
-    let allImagesLoaded = false;
-
-    // Preload images
-    let loadedImagesCount = 0;
-    for (let i = 1; i <= 12; i++) {
-      const img = new Image();
-      // Використовуємо fallback URL для тестування
-      img.src = `images/${i.toString().padStart(2, '0')}.jpg`;
-      img.onload = () => {
-        loadedImagesCount++;
-        console.log(`Image ${i} loaded successfully`);
-        if (loadedImagesCount === totalMonths) {
-          allImagesLoaded = true;
-          console.log('All images loaded successfully');
-        }
-      };
-      img.onerror = () => {
-        console.error(`Failed to load image: images/${i.toString().padStart(2, '0')}.jpg`);
-        loadedImagesCount++;
-        // Навіть якщо зображення не завантажилось, продовжуємо
-        if (loadedImagesCount === totalMonths) {
-          allImagesLoaded = true;
-        }
-      };
-      images.push(img);
-    }
-
-    // Wait for everything to load
-    window.addEventListener('load', function() {
-      const loadingEl = document.getElementById('loading');
-      
-      // Check if required libraries are available
-      if (typeof THREE === 'undefined') {
-        loadingEl.style.display = 'none';
-        document.getElementById('info').innerHTML = translations[currentLang].errorLibrary;
-        console.error('THREE.js is not defined');
-        return;
-      }
-
-      if (typeof MindARThree === 'undefined') {
-        loadingEl.style.display = 'none';
-        document.getElementById('info').innerHTML = translations[currentLang].errorLibrary;
-        console.error('MindARThree is not defined. Available globals:', Object.keys(window));
-        return;
-      }
-
-      console.log('All libraries loaded successfully');
-      
-      // Initialize MindAR
-      try {
-        const mindarThree = new MindARThree({
-          container: document.getElementById("mindar-container"),
-          imageTargetSrc: "calendar.mind",
-          maxTrack: 1, // Спочатку спробуємо з одним маркером
-          uiScanning: translations[currentLang].scanning,
-          uiLoading: translations[currentLang].loading,
-        });
-
-        const { renderer, scene, camera } = mindarThree;
-        renderer.setPixelRatio(DPR);
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-        // Lighting setup
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5);
-        directionalLight.position.set(0, 1, 1);
-        directionalLight.castShadow = true;
-        scene.add(directionalLight);
-        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-
-        // AR groups for targets
-        const arGroups = [];
-        for (let i = 0; i < 12; i++) {
-          const group = new THREE.Group();
-          const anchor = mindarThree.addAnchor(i);
-          anchor.group.add(group);
-          arGroups.push(group);
-        }
-
-        // Resize handler
-        function onWindowResize() {
-          const w = window.innerWidth, h = window.innerHeight;
-          camera.aspect = w / h;
-          camera.updateProjectionMatrix();
-          renderer.setSize(w, h);
-        }
-        window.addEventListener('resize', onWindowResize, { passive: true });
-        window.addEventListener('orientationchange', () => setTimeout(onWindowResize, 300));
-
-        // Unified touch/mouse handler
-        const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-        let dragging = false;
-        
-        function addUnifiedTouch(el, onStart, onMove = () => {}, onEnd = () => {}) {
-          const startHandler = (e) => {
-            e.preventDefault();
-            dragging = true;
-            const touch = isMobile ? e.touches[0] : e;
-            onStart(touch);
-          };
-          const moveHandler = (e) => {
-            if (!dragging) return;
-            e.preventDefault();
-            const touch = isMobile ? e.touches[0] : e;
-            onMove(touch);
-          };
-          const endHandler = (e) => {
-            e.preventDefault();
-            dragging = false;
-            onEnd();
-          };
-
-          if (isMobile) {
-            el.addEventListener('touchstart', startHandler, { passive: false });
-            el.addEventListener('touchmove', moveHandler, { passive: false });
-            el.addEventListener('touchend', endHandler, { passive: false });
-            el.addEventListener('touchcancel', endHandler, { passive: false });
-          } else {
-            el.addEventListener('mousedown', startHandler);
-            el.addEventListener('mousemove', moveHandler);
-            el.addEventListener('mouseup', endHandler);
-            el.addEventListener('mouseleave', endHandler);
-          }
-        }
-
-        // Haptic feedback for mobile
-        function hapticFeedback(pattern = [100]) {
-          if (isMobile && navigator.vibrate) {
-            navigator.vibrate(pattern);
-          }
-        }
-
-        // Start AR
-        loadingEl.style.display = 'block';
-        
-        mindarThree.start().then(() => {
-          loadingEl.style.display = 'none';
-          let lastVisible = -1;
-          const clock = new THREE.Clock();
-
-          const animate = () => {
-            const delta = clock.getDelta();
-            renderer.render(scene, camera);
-            
-            let currentVisible = -1;
-            for (let i = 0; i < 12; i++) {
-              if (mindarThree.anchors[i] && mindarThree.anchors[i].visible) {
-                currentVisible = i;
-                break;
-              }
-            }
-            
-            if (currentVisible !== lastVisible) {
-              if (lastVisible !== -1) arGroups[lastVisible].clear();
-              if (currentVisible !== -1 && allImagesLoaded) {
-                setTimeout(() => showMonthContent(currentVisible, arGroups[currentVisible]), 300);
-              }
-              lastVisible = currentVisible;
-            }
-            requestAnimationFrame(animate);
-          };
-          animate();
-        }).catch(e => {
-          loadingEl.style.display = 'none';
-          document.getElementById('info').innerHTML = translations[currentLang].errorCamera;
-          console.error('AR Error:', e);
-        });
-
-        // Main mechanics
-        function showMonthContent(month, arGroup) {
-          if (collectedCrystals.includes(month)) {
-            showCrystalReward(month, arGroup);
-            return;
-          }
-          
-          const img = images[month];
-          
-          arGroup.clear();
-          
-          // Створюємо просту геометрію для тесту
-          const geometry = new THREE.PlaneGeometry(1, 1);
-          const material = new THREE.MeshBasicMaterial({ 
-            color: 0x00ffff,
-            transparent: true,
-            opacity: 0.8
-          });
-          const mesh = new THREE.Mesh(geometry, material);
-          arGroup.add(mesh);
-
-          // Додаємо текст з номером місяця
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          canvas.width = 256;
-          canvas.height = 256;
-          context.fillStyle = '#00ffff';
-          context.font = 'bold 100px Arial';
-          context.textAlign = 'center';
-          context.textBaseline = 'middle';
-          context.fillText((month + 1).toString(), 128, 128);
-          
-          const texture = new THREE.CanvasTexture(canvas);
-          const textMaterial = new THREE.MeshBasicMaterial({ 
-            map: texture,
-            transparent: true
-          });
-          const textMesh = new THREE.Mesh(geometry, textMaterial);
-          textMesh.position.z = 0.01;
-          arGroup.add(textMesh);
-
-          const startInteraction = () => {
-            hapticFeedback([50]);
-            arGroup.clear();
-            showCrystalReward(month, arGroup);
-          };
-
-          addUnifiedTouch(renderer.domElement, startInteraction);
-        }
-
-        function showCrystalReward(month, arGroup) {
-          if (collectedCrystals.includes(month)) return;
-          collectedCrystals.push(month);
-          localStorage.setItem('ua-crystals2026', JSON.stringify(collectedCrystals));
-          updateCrystalsUI();
-          arGroup.clear();
-
-          const colors = ['#00ffff', '#ff00ff', '#00ff00', '#ffff00', '#ff8800', '#ff0066', '#0066ff', '#ff3399', '#33ff99', '#ffcc00', '#cc00ff', '#00ccff'];
-          const crystalGeo = new THREE.IcosahedronGeometry(0.35, 1);
-          const crystalMat = new THREE.MeshStandardMaterial({
-            color: colors[month],
-            emissive: colors[month],
-            emissiveIntensity: 4,
-            roughness: 0,
-            metalness: 0.85
-          });
-          const crystal = new THREE.Mesh(crystalGeo, crystalMat);
-          crystal.position.z = 0.2;
-          crystal.castShadow = true;
-          arGroup.add(crystal);
-
-          const animateCrystal = () => {
-            if (!arGroup.parent) return;
-            crystal.rotation.y += 0.015;
-            crystal.rotation.x += 0.005;
-            const scale = 1 + Math.sin(Date.now() * 0.004) * 0.08;
-            crystal.scale.setScalar(scale);
-            requestAnimationFrame(animateCrystal);
-          };
-          animateCrystal();
-          hapticFeedback([200]);
-
-          if (collectedCrystals.length === 12) {
-            setTimeout(() => {
-              arGroup.clear();
-              document.getElementById('info').innerHTML = translations[currentLang].infoComplete;
-              hapticFeedback([300, 100, 300]);
-            }, 2000);
-          }
-        }
-
-      } catch (error) {
-        loadingEl.style.display = 'none';
-        document.getElementById('info').innerHTML = translations[currentLang].errorLibrary;
-        console.error('Initialization error:', error);
-      }
-
-    });
 
     function updateCrystalsUI() {
       const container = document.getElementById('crystals');
@@ -494,8 +205,211 @@
       }
     }
 
-    // Initial UI update
+    // Події кнопок
+    document.getElementById('lang-toggle').addEventListener('click', () => {
+      setLang(currentLang === 'en' ? 'uk' : 'en');
+    });
+    
+    document.getElementById('etsy-link').addEventListener('click', () => {
+      window.open('https://smartlessa.etsy.com', '_blank');
+    });
+
+    // Ініціалізація мови
+    const savedLang = localStorage.getItem('calendar-lang');
+    if (savedLang === 'uk') setLang('uk');
+
+    // Головна функція AR
+    function initializeAR() {
+      console.log('Initializing AR...');
+      
+      if (typeof THREE === 'undefined') {
+        showError('THREE.js not loaded');
+        return;
+      }
+
+      if (typeof MindARThree === 'undefined') {
+        showError('MindAR not loaded');
+        return;
+      }
+
+      try {
+        const mindarThree = new MindARThree({
+          container: document.getElementById("mindar-container"),
+          imageTargetSrc: "calendar.mind",
+          maxTrack: 1,
+          uiScanning: "Looking for marker...",
+          uiLoading: "Loading AR..."
+        });
+
+        const { renderer, scene, camera } = mindarThree;
+        
+        // Світло
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(0, 1, 1);
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+        // Групи для маркерів
+        const anchorGroups = [];
+        for (let i = 0; i < 12; i++) {
+          const group = new THREE.Group();
+          const anchor = mindarThree.addAnchor(i);
+          anchor.group.add(group);
+          anchorGroups.push(group);
+        }
+
+        // Запуск AR
+        const loadingEl = document.getElementById('loading');
+        loadingEl.style.display = 'block';
+
+        mindarThree.start().then(() => {
+          console.log('AR started successfully');
+          loadingEl.style.display = 'none';
+          
+          let lastVisible = -1;
+
+          const animate = () => {
+            renderer.render(scene, camera);
+            
+            // Перевіряємо видимість маркерів
+            let currentVisible = -1;
+            for (let i = 0; i < 12; i++) {
+              if (mindarThree.anchors[i] && mindarThree.anchors[i].visible) {
+                currentVisible = i;
+                break;
+              }
+            }
+
+            if (currentVisible !== lastVisible) {
+              if (lastVisible !== -1) {
+                anchorGroups[lastVisible].clear();
+              }
+              if (currentVisible !== -1) {
+                showMonthContent(currentVisible, anchorGroups[currentVisible]);
+              }
+              lastVisible = currentVisible;
+            }
+
+            requestAnimationFrame(animate);
+          };
+          animate();
+
+        }).catch(error => {
+          loadingEl.style.display = 'none';
+          showError(translations[currentLang].errorCamera);
+          console.error('AR failed:', error);
+        });
+
+        // Показати вміст для місяця
+        function showMonthContent(month, arGroup) {
+          if (collectedCrystals.includes(month)) {
+            showCrystal(month, arGroup);
+            return;
+          }
+
+          arGroup.clear();
+
+          // Створюємо простий контент
+          const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 
+                         0xff8800, 0x88ff00, 0x0088ff, 0xff0088, 0x8800ff, 0x00ff88];
+          
+          const geometry = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+          const material = new THREE.MeshBasicMaterial({ 
+            color: colors[month],
+            transparent: true,
+            opacity: 0.8
+          });
+          
+          const cube = new THREE.Mesh(geometry, material);
+          arGroup.add(cube);
+
+          // Додаємо текст
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.width = 256;
+          canvas.height = 256;
+          context.fillStyle = '#ffffff';
+          context.font = 'bold 80px Arial';
+          context.textAlign = 'center';
+          context.textBaseline = 'middle';
+          context.fillText((month + 1).toString(), 128, 128);
+          
+          const texture = new THREE.CanvasTexture(canvas);
+          const textMaterial = new THREE.MeshBasicMaterial({ 
+            map: texture,
+            transparent: true
+          });
+          const textPlane = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.4), textMaterial);
+          textPlane.position.z = 0.2;
+          arGroup.add(textPlane);
+
+          // Обробка торкання
+          function handleTouch() {
+            showCrystal(month, arGroup);
+          }
+
+          // Додаємо обробники подій
+          renderer.domElement.addEventListener('click', handleTouch);
+          renderer.domElement.addEventListener('touchstart', handleTouch);
+        }
+
+        function showCrystal(month, arGroup) {
+          if (collectedCrystals.includes(month)) return;
+
+          collectedCrystals.push(month);
+          localStorage.setItem('ua-crystals2026', JSON.stringify(collectedCrystals));
+          updateCrystalsUI();
+          
+          arGroup.clear();
+
+          // Створюємо кристал
+          const geometry = new THREE.OctahedronGeometry(0.3, 0);
+          const material = new THREE.MeshBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.9
+          });
+          
+          const crystal = new THREE.Mesh(geometry, material);
+          arGroup.add(crystal);
+
+          // Анімація
+          function animateCrystal() {
+            if (!arGroup.parent) return;
+            crystal.rotation.y += 0.02;
+            crystal.rotation.x += 0.01;
+            requestAnimationFrame(animateCrystal);
+          }
+          animateCrystal();
+
+          // Перевірка завершення
+          if (collectedCrystals.length === totalMonths) {
+            setTimeout(() => {
+              document.getElementById('info').innerHTML = translations[currentLang].infoComplete;
+            }, 1000);
+          }
+        }
+
+        function showError(message) {
+          document.getElementById('info').innerHTML = message;
+          document.getElementById('loading').style.display = 'none';
+        }
+
+      } catch (error) {
+        console.error('AR initialization error:', error);
+        showError(translations[currentLang].errorLibrary);
+      }
+    }
+
+    // Запускаємо AR після завантаження сторінки
+    window.addEventListener('load', function() {
+      console.log('Page loaded, starting AR...');
+      setTimeout(initializeAR, 1000); // Невелика затримка для стабільності
+    });
+
+    // Оновлюємо UI
     updateCrystalsUI();
+
   </script>
 </body>
 </html>
