@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR Calendar Puzzle | Календар AR Пазли</title>
     
-    <!-- 🔥 Тільки ці 2 скрипти -->
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <!-- 🔥 Критично: правильно завантажуємо скрипти -->
+    <script defer src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -117,13 +117,15 @@
     </div>
 
     <div id="ar-container">
+        <!-- 🔥 Оновлений <a-scene> без конфліктних параметрів -->
         <a-scene 
-            mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/lessa2332/your-calendar@main/calendar.mind; autoStart: false; uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.001; filterBeta: 1000;"
+            mindar-image="imageTargetSrc: https://lessa2332.github.io/your-calendar/calendar.mind; autoStart: false; uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.001; filterBeta: 0.01;"
             embedded
             color-space="sRGB"
-            renderer="colorManagement: true; physicallyCorrectLights"
+            renderer="antialias: true; sortObjects: true"
             vr-mode-ui="enabled: false"
-            device-orientation-permission-ui="enabled: false">
+            device-orientation-permission-ui="enabled: false"
+            webxr="requiredFeatures: none">
             
             <a-entity camera></a-entity>
             <a-entity id="puzzle-targets-container"></a-entity>
@@ -243,19 +245,30 @@
                 this.setupEventListeners();
                 this.setupDragAndDrop();
 
-                // Створюємо контейнери ПІСЛЯ завантаження сцени
+                // 🔥 Критична перевірка ініціалізації
                 this.scene.addEventListener('loaded', () => {
-                    this.createTargetContainers();
-                    this.createGrid();
+                    try {
+                        // Перевірка рендерера
+                        if (!this.scene.renderer) {
+                            throw new Error('Renderer not initialized');
+                        }
+                        // Перевірка MindAR компонента
+                        const mindarComp = this.scene.components['mindar-image'];
+                        if (!mindarComp || typeof mindarComp.setup !== 'function') {
+                            throw new Error('MindAR component not ready');
+                        }
 
-                    const mindarComp = this.scene.querySelector('[mindar-image]').components['mindar-image'];
-                    if (!mindarComp) {
-                        document.getElementById('processing-info').textContent = "❌ AR failed to initialize.";
-                        return;
+                        // Створюємо сцену
+                        this.createTargetContainers();
+                        this.createGrid();
+
+                        setTimeout(() => {
+                            document.getElementById('loading-screen').style.display = 'none';
+                        }, 500);
+                    } catch (e) {
+                        console.error('Init failed:', e);
+                        document.getElementById('processing-info').textContent = `❌ Error: ${e.message}`;
                     }
-                    setTimeout(() => {
-                        document.getElementById('loading-screen').style.display = 'none';
-                    }, 500);
                 });
 
                 this.scene.addEventListener('mindar-image-targetFound', (e) => {
@@ -323,8 +336,11 @@
                     document.getElementById('instructions').classList.add('hidden');
                     document.getElementById('puzzle-board').setAttribute('visible', 'true');
                     this.gridSlots.forEach(slot => slot.element.setAttribute('visible', 'true'));
-                    const mindarComp = this.scene.querySelector('[mindar-image]').components['mindar-image'];
-                    if (mindarComp) mindarComp.start();
+                    
+                    const mindarComp = this.scene.components['mindar-image'];
+                    if (mindarComp && typeof mindarComp.start === 'function') {
+                        mindarComp.start();
+                    }
                 });
 
                 document.getElementById('continue-btn').addEventListener('click', () => {
@@ -343,7 +359,8 @@
             }
 
             async loadAndShowPuzzle(targetIndex) {
-                const url = `https://cdn.jsdelivr.net/gh/lessa2332/your-calendar@main/images/${String(targetIndex + 1).padStart(2, '0')}.jpg`;
+                // 🔥 Використовуємо GitHub Pages для зображень
+                const url = `https://lessa2332.github.io/your-calendar/images/${String(targetIndex + 1).padStart(2, '0')}.jpg`;
                 const container = document.getElementById(`puzzle-container-${targetIndex}`);
                 while (container.firstChild) container.removeChild(container.firstChild);
 
@@ -483,9 +500,14 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        // Запускаємо лише після повного завантаження DOM
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                window.puzzleGame = new ARPuzzleGame();
+            });
+        } else {
             window.puzzleGame = new ARPuzzleGame();
-        });
+        }
     </script>
 </body>
 </html>
