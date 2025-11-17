@@ -5,10 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR Calendar Puzzle | Календар AR Пазли</title>
     
-    <!-- MindAR та Three.js -->
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.3/dist/mindar-image.prod.js"></script>
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.3/dist/mindar-image-aframe.prod.js"></script>
+    <!-- 🔥 КРИТИЧНО: лише ці 2 скрипти, у цьому порядку -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -119,7 +118,7 @@
 
     <div id="ar-container">
         <a-scene 
-            mindar-image="imageTargetSrc: https://lessa2332.github.io/your-calendar/calendar.mind; autoStart: false; uiLoading: no; uiScanning: no; uiError: no;"
+            mindar-image="imageTargetSrc: https://lessa2332.github.io/your-calendar/calendar.mind; autoStart: false; uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.001; filterBeta: 0.01;"
             embedded
             color-space="sRGB"
             renderer="colorManagement: true; physicallyCorrectLights"
@@ -241,15 +240,17 @@
 
             async init() {
                 this.setupLocalization();
-                this.createTargetContainers();
-                this.createGrid();
                 this.setupEventListeners();
                 this.setupDragAndDrop();
 
+                // 🔥 ВАЖЛИВО: створюємо контейнери ПІСЛЯ завантаження сцени
                 this.scene.addEventListener('loaded', () => {
+                    this.createTargetContainers();
+                    this.createGrid();
+
                     const mindarComp = this.scene.querySelector('[mindar-image]').components['mindar-image'];
                     if (!mindarComp) {
-                        document.getElementById('processing-info').textContent = "❌ Failed to load AR engine.";
+                        document.getElementById('processing-info').textContent = "❌ AR failed to initialize.";
                         return;
                     }
                     setTimeout(() => {
@@ -342,7 +343,6 @@
             }
 
             async loadAndShowPuzzle(targetIndex) {
-                // ✅ ВИПРАВЛЕНО: GitHub Pages замість raw.githubusercontent.com
                 const url = `https://lessa2332.github.io/your-calendar/images/${String(targetIndex + 1).padStart(2, '0')}.jpg`;
                 const container = document.getElementById(`puzzle-container-${targetIndex}`);
                 while (container.firstChild) container.removeChild(container.firstChild);
