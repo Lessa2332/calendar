@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR Calendar Puzzle | Календар AR Пазли</title>
     
-    <!-- 🔥 КРИТИЧНО: лише ці 2 скрипти, у цьому порядку -->
+    <!-- 🔥 Тільки ці 2 скрипти -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
     
@@ -118,7 +118,7 @@
 
     <div id="ar-container">
         <a-scene 
-            mindar-image="imageTargetSrc: https://lessa2332.github.io/your-calendar/calendar.mind; autoStart: false; uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.001; filterBeta: 0.01;"
+            mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/lessa2332/your-calendar@master/calendar.mind; autoStart: false; uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.001; filterBeta: 1000;"
             embedded
             color-space="sRGB"
             renderer="colorManagement: true; physicallyCorrectLights"
@@ -243,7 +243,7 @@
                 this.setupEventListeners();
                 this.setupDragAndDrop();
 
-                // 🔥 ВАЖЛИВО: створюємо контейнери ПІСЛЯ завантаження сцени
+                // Створюємо контейнери ПІСЛЯ завантаження сцени
                 this.scene.addEventListener('loaded', () => {
                     this.createTargetContainers();
                     this.createGrid();
@@ -343,7 +343,7 @@
             }
 
             async loadAndShowPuzzle(targetIndex) {
-                const url = `https://lessa2332.github.io/your-calendar/images/${String(targetIndex + 1).padStart(2, '0')}.jpg`;
+                const url = `https://cdn.jsdelivr.net/gh/lessa2332/your-calendar@master/images/${String(targetIndex + 1).padStart(2, '0')}.jpg`;
                 const container = document.getElementById(`puzzle-container-${targetIndex}`);
                 while (container.firstChild) container.removeChild(container.firstChild);
 
