@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR Calendar Puzzle | Календар AR Пазли</title>
     
-    <!-- 🔥 КРИТИЧНО: завантажуємо з defer для правильного порядку -->
-    <script defer src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <!-- 🔥 Сумісні версії: A-Frame 1.4.0 + MindAR 1.2.3 -->
+    <script defer src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.3/dist/mindar-image-aframe.prod.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -117,14 +117,14 @@
     </div>
 
     <div id="ar-container">
+        <!-- 🔥 Правильний <a-scene> для A-Frame 1.4.0 -->
         <a-scene 
             mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/lessa2332/your-calendar/calendar.mind; autoStart: false; uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.001; filterBeta: 1000;"
             embedded
             color-space="sRGB"
-            renderer="antialias: true; sortObjects: true"
+            renderer="antialias: true"
             vr-mode-ui="enabled: false"
-            device-orientation-permission-ui="enabled: false"
-            webxr="requiredFeatures: none">
+            device-orientation-permission-ui="enabled: false">
             
             <a-entity camera></a-entity>
             <a-entity id="puzzle-targets-container"></a-entity>
@@ -245,23 +245,18 @@
                 this.setupDragAndDrop();
 
                 this.scene.addEventListener('loaded', () => {
-                    try {
-                        setTimeout(() => {
-                            const mindarComp = this.scene.components['mindar-image'];
-                            if (!mindarComp || typeof mindarComp.setup !== 'function') {
-                                throw new Error('MindAR component not ready');
-                            }
+                    setTimeout(() => {
+                        const mindarComp = this.scene.components['mindar-image'];
+                        if (!mindarComp) {
+                            document.getElementById('processing-info').textContent = "❌ AR failed to initialize.";
+                            return;
+                        }
+                        this.createTargetContainers();
+                        this.createGrid();
 
-                            this.createTargetContainers();
-                            this.createGrid();
-
-                            document.getElementById('loading-screen').style.display = 'none';
-                            document.getElementById('processing-info').textContent = "✅ AR Ready! Tap Start to begin";
-                        }, 800);
-                    } catch (e) {
-                        console.error('Init failed:', e);
-                        document.getElementById('processing-info').textContent = `❌ Error: ${e.message}`;
-                    }
+                        document.getElementById('loading-screen').style.display = 'none';
+                        document.getElementById('processing-info').textContent = "✅ AR Ready! Tap Start";
+                    }, 800);
                 });
 
                 this.scene.addEventListener('mindar-image-targetFound', (e) => {
@@ -329,7 +324,6 @@
                     document.getElementById('instructions').classList.add('hidden');
                     document.getElementById('puzzle-board').setAttribute('visible', 'true');
                     this.gridSlots.forEach(slot => slot.element.setAttribute('visible', 'true'));
-                    
                     const mindarComp = this.scene.components['mindar-image'];
                     if (mindarComp && typeof mindarComp.start === 'function') {
                         mindarComp.start();
@@ -378,10 +372,10 @@
                         pieceEl.appendChild(plane);
                         container.appendChild(pieceEl);
                     });
-                    document.getElementById('processing-info').textContent = "✅ Puzzle loaded! Drag pieces to board";
+                    document.getElementById('processing-info').textContent = "✅ Drag pieces to board";
                 } catch (err) {
                     console.error("Puzzle load error:", err);
-                    document.getElementById('processing-info').textContent = "⚠️ Failed to load image. Check internet connection.";
+                    document.getElementById('processing-info').textContent = "⚠️ Image failed to load";
                 }
             }
 
@@ -471,7 +465,7 @@
                     fx.appendChild(star);
                 }
                 document.getElementById('completion-message').classList.remove('hidden');
-                document.getElementById('processing-info').textContent = "🎉 Puzzle completed! Amazing!";
+                document.getElementById('processing-info').textContent = "🎉 Completed!";
             }
 
             resetPuzzle() {
@@ -492,14 +486,13 @@
                     slot.occupied = false;
                     slot.element.setAttribute('visible', 'false');
                 });
-                document.getElementById('processing-info').textContent = "🔍 Point camera at calendar image";
+                document.getElementById('processing-info').textContent = "🔍 Point at calendar image";
             }
         }
 
-        // 🔥 Надійна ініціалізація з перевіркою AFRAME
+        // 🔥 Надійна ініціалізація
         function initGame() {
             if (typeof AFRAME === 'undefined') {
-                // Чекаємо завантаження A-Frame
                 setTimeout(initGame, 100);
                 return;
             }
