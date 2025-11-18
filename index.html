@@ -3,36 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-  <title>Магічний пазл для зірочки</title>
-  <!-- Стабільна комбо: A-Frame 1.2.0 + MindAR 1.1.4 (офіційний приклад) -->
+  <title>Магічний пазл для моєї зірочки</title>
   <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.1.4/dist/mindar-image.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.1.4/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
   <style>
-    body,html{margin:0;height:100%;overflow:hidden;background:#000;font-family:"Comic Sans MS",sans-serif}
-    #hint{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:hotpink;color:#fff;padding:16px 32px;border-radius:50px;font-size:24px;z-index:999;box-shadow:0 0 30px hotpink}
-    #win{position:fixed;inset:0;background:rgba(0,0,0,0.97);color:gold;font-size:80px;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:1000;text-align:center}
+    body,html{margin:0;height:100%;overflow:hidden;background:#000}
+    #hint{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#ff1493;color:#fff;padding:16px 35px;border-radius:50px;font-size:24px;z-index:999;box-shadow:0 0 30px #ff1493;font-family:"Comic Sans MS",sans-serif}
+    #win{position:fixed;inset:0;background:rgba(0,0,0,0.97);color:gold;font-size:80px;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:1000}
     #win span{animation:bounce 1s infinite}
     @keyframes bounce{0%,100%{transform:scale(1)}50%{transform:scale(1.5)}}
   </style>
 </head>
 <body>
 
-<div id="hint">Наведи камеру на маркер — почнеться магія! 🌟</div>
-<div id="win"><span>УРААА!</span><br>Ти найкращий чарівник!</div>
+<div id="hint">Наведи камеру на маркер – почнеться магія!</div>
+<div id="win"><span>УРААА!</span><br>Ти найкращий!</div>
 
-<a-scene
-  embedded
-  mindar-image="imageTargetSrc: calendar.mind; uiLoading: no; uiError: no; uiScanning: no;"
-  color-space="sRGB"
-  renderer="colorManagement: true, physicallyCorrectLights: true"
-  vr-mode-ui="enabled: false"
-  device-orientation-permission-ui="enabled: false">
+<a-scene embedded mindar-image="imageTargetSrc: calendar.mind" renderer="colorManagement:true">
 
-  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+  <a-assets timeout="10000">
+    <img id="photo" src="images/01.jpg">
+  </a-assets>
 
-  <a-entity mindar-image-target="targetIndex: 0">
+  <a-camera></a-camera>
+
+  <a-entity mindar-image-target="targetIndex:0">
     <a-entity id="puzzle"></a-entity>
   </a-entity>
 
@@ -41,80 +38,73 @@
 <audio id="yay" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3" preload="auto"></audio>
 
 <script>
-  // Правильний запуск MindAR після повного завантаження (без ретраїв)
-  document.querySelector('a-scene').addEventListener('loaded', async () => {
-    const sceneEl = document.querySelector('a-scene');
-    const mindar = sceneEl.components['mindar-image-system'];
-    await mindar.start(); // Офіційний метод з прикладу MindAR
-    console.log('MindAR started successfully!'); // Для перевірки в консолі
-  });
+// ПРАВИЛЬНИЙ запуск MindAR 1.1.4
+document.querySelector('a-scene').addEventListener('loaded', () => {
+  const sceneEl = document.querySelector('a-scene');
+  const mindarSystem = sceneEl.systems['mindar-image'];
+  mindarSystem.start();        // ← Ось так правильно!
+});
 
-  // Створюємо пазл тільки коли маркер знайдено (один раз)
-  let puzzleCreated = false;
-  document.querySelector('a-scene').addEventListener('targetFound', () => {
-    if (!puzzleCreated) {
-      puzzleCreated = true;
-      setTimeout(createPuzzle, 500); // Невелика затримка для стабільності
-    }
-  });
-
-  async function createPuzzle() {
-    const img = new Image();
-    img.src = 'images/01.jpg?t=' + Date.now();
-    await img.decode();
-
-    const pieceW = img.width / 3;
-    const pieceH = img.height / 3;
-    const scaleW = 0.5 / 3;
-    const scaleH = (img.height / img.width) * 0.5 / 3;
-    const pieces = [];
-
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 3; col++) {
-        const canvas = document.createElement('canvas');
-        canvas.width = pieceW;
-        canvas.height = pieceH;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, col * pieceW, row * pieceH, pieceW, pieceH, 0, 0, pieceW, pieceH);
-
-        const plane = document.createElement('a-plane');
-        plane.setAttribute('src', canvas.toDataURL());
-        plane.setAttribute('width', scaleW * 2);
-        plane.setAttribute('height', scaleH * 2);
-        plane.setAttribute('position', `${(Math.random() - 0.5) * 1.4} ${(Math.random() - 0.5) * 1.4} 0.02`);
-        plane.setAttribute('data-target-x', (col - 1) * scaleW);
-        plane.setAttribute('data-target-y', (1 - row) * scaleH);
-        plane.classList.add('piece', 'raycastable');
-        document.getElementById('puzzle').appendChild(plane);
-        pieces.push(plane);
-      }
-    }
-
-    // Клік по шматочку (дитячий підхід: міняємо місцями з випадковим)
-    document.querySelector('a-scene').addEventListener('click', e => {
-      const piece = e.detail.intersectedEls?.[0];
-      if (!piece || !piece.classList.contains('piece')) return;
-
-      const other = pieces.filter(p => p !== piece)[Math.floor(Math.random() * 8)];
-      const tmp = piece.getAttribute('position');
-      piece.setAttribute('position', other.getAttribute('position'));
-      other.setAttribute('position', tmp);
-
-      // Перевірка перемоги (з толерантністю для легкості)
-      if (pieces.every(p => {
-        const pos = p.getAttribute('position');
-        const tx = parseFloat(p.dataset.targetX);
-        const ty = parseFloat(p.dataset.targetY);
-        return Math.abs(pos.x - tx) < 0.08 && Math.abs(pos.y - ty) < 0.08;
-      })) {
-        document.getElementById('win').style.display = 'flex';
-        document.getElementById('yay').play();
-        confetti({ particleCount: 600, spread: 120, origin: { y: 0.6 } });
-      }
-    });
+let puzzleCreated = false;
+document.querySelector('a-scene').addEventListener('targetFound', () => {
+  if (!puzzleCreated) {
+    puzzleCreated = true;
+    setTimeout(createPuzzle, 600);
   }
+});
+
+async function createPuzzle() {
+  const img = document.getElementById('photo');
+  await img.decode();
+
+  const pw = img.naturalWidth / 3;
+  const ph = img.naturalHeight / 3;
+  const sw = 0.5 / 3;
+  const sh = (img.naturalHeight / img.naturalWidth) * 0.5 / 3;
+  const pieces = [];
+
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      const canvas = document.createElement('canvas');
+      canvas.width = pw; canvas.height = ph;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, col*pw, row*ph, pw, ph, 0, 0, pw, ph);
+
+      const plane = document.createElement('a-plane');
+      plane.setAttribute('src', canvas.toDataURL());
+      plane.setAttribute('width', sw*2);
+      plane.setAttribute('height', sh*2);
+      plane.setAttribute('position', `${(Math.random()-0.5)*1.4} ${(Math.random()-0.5)*1.4} 0.02`);
+      plane.setAttribute('data-target-x', (col-1)*sw);
+      plane.setAttribute('data-target-y', (1-row)*sh);
+      plane.classList.add('piece','raycastable');
+      document.getElementById('puzzle').appendChild(plane);
+      pieces.push(plane);
+    }
+  }
+
+  document.querySelector('a-scene').addEventListener('click', e => {
+    const piece = e.detail.intersectedEls?.[0];
+    if (!piece || !piece.classList.contains('piece')) return;
+
+    const other = pieces.filter(p => p !== piece)[Math.floor(Math.random()*8)];
+    const tmp = piece.getAttribute('position');
+    piece.setAttribute('position', other.getAttribute('position'));
+    other.setAttribute('position', tmp);
+
+    if (pieces.every(p => {
+      const pos = p.getAttribute('position');
+      const tx = parseFloat(p.dataset.targetX);
+      const ty = parseFloat(p.dataset.targetY);
+      return Math.abs(pos.x - tx) < 0.08 && Math.abs(pos.y - ty) < 0.08;
+    })) {
+      document.getElementById('win').style.display = 'flex';
+      document.getElementById('yay').play();
+      confetti({particleCount:600, spread:120, origin:{y:0.6}});
+    }
+  });
+}
 </script>
 </body>
-</html>
 </html>
 
