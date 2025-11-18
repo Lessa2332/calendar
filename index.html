@@ -116,26 +116,8 @@
         <button class="lang-btn" data-lang="uk">UA</button>
     </div>
 
-    <div id="ar-container">
-        <a-scene 
-            mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/lessa2332/your-calendar/calendar.mind; autoStart: false; uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.001; filterBeta: 1000;"
-            embedded
-            color-space="sRGB"
-            renderer="antialias: true"
-            vr-mode-ui="enabled: false"
-            device-orientation-permission-ui="enabled: false">
-            
-            <a-entity camera></a-entity>
-            <a-entity id="puzzle-targets-container"></a-entity>
-
-            <a-entity id="puzzle-board" position="0 0 -1.5" visible="false">
-                <a-plane id="board" color="#f0f0f0" width="2.5" height="2.5" position="0 0 0"></a-plane>
-                <a-entity id="grid-container"></a-entity>
-            </a-entity>
-
-            <a-entity id="victory-effects" visible="false"></a-entity>
-        </a-scene>
-    </div>
+    <!-- 🔥 ПОРОЖНІЙ КОНТЕЙНЕР — сцену створимо через JS -->
+    <div id="ar-container"></div>
 
     <div id="ui-overlay">
         <div id="instructions">
@@ -489,26 +471,65 @@
             }
         }
 
-        // 🔥 Безпечна ініціалізація: чекаємо, поки mindar-image зареєструється
-        function waitForARReady() {
-            const scene = document.querySelector('a-scene');
-            if (!scene) {
-                setTimeout(waitForARReady, 100);
+        // 🔥 КРИТИЧНО: створюємо сцену лише після завантаження A-Frame і MindAR
+        function initARScene() {
+            if (typeof AFRAME === 'undefined' || !AFRAME.components['mindar-image']) {
+                setTimeout(initARScene, 100);
                 return;
             }
 
-            const checkInterval = setInterval(() => {
-                if (scene.components && scene.components['mindar-image']) {
-                    clearInterval(checkInterval);
-                    window.puzzleGame = new ARPuzzleGame();
-                }
-            }, 100);
+            // Створюємо <a-scene>
+            const scene = document.createElement('a-scene');
+            scene.setAttribute('mindar-image', 'imageTargetSrc: https://cdn.jsdelivr.net/gh/lessa2332/your-calendar/calendar.mind; autoStart: false; uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.001; filterBeta: 1000;');
+            scene.setAttribute('embedded', '');
+            scene.setAttribute('color-space', 'sRGB');
+            scene.setAttribute('renderer', 'antialias: true');
+            scene.setAttribute('vr-mode-ui', 'enabled: false');
+            scene.setAttribute('device-orientation-permission-ui', 'enabled: false');
+
+            // Камера
+            const camera = document.createElement('a-entity');
+            camera.setAttribute('camera', '');
+            scene.appendChild(camera);
+
+            // Контейнери
+            const puzzleTargets = document.createElement('a-entity');
+            puzzleTargets.id = 'puzzle-targets-container';
+            scene.appendChild(puzzleTargets);
+
+            const puzzleBoard = document.createElement('a-entity');
+            puzzleBoard.id = 'puzzle-board';
+            puzzleBoard.setAttribute('position', '0 0 -1.5');
+            puzzleBoard.setAttribute('visible', 'false');
+            const boardPlane = document.createElement('a-plane');
+            boardPlane.id = 'board';
+            boardPlane.setAttribute('color', '#f0f0f0');
+            boardPlane.setAttribute('width', '2.5');
+            boardPlane.setAttribute('height', '2.5');
+            boardPlane.setAttribute('position', '0 0 0');
+            puzzleBoard.appendChild(boardPlane);
+            const gridContainer = document.createElement('a-entity');
+            gridContainer.id = 'grid-container';
+            puzzleBoard.appendChild(gridContainer);
+            scene.appendChild(puzzleBoard);
+
+            const victoryEffects = document.createElement('a-entity');
+            victoryEffects.id = 'victory-effects';
+            victoryEffects.setAttribute('visible', 'false');
+            scene.appendChild(victoryEffects);
+
+            // Додаємо сцену в DOM
+            document.getElementById('ar-container').appendChild(scene);
+
+            // Тепер стартуємо гру
+            window.puzzleGame = new ARPuzzleGame();
         }
 
+        // Запускаємо після DOM завантаження
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', waitForARReady);
+            document.addEventListener('DOMContentLoaded', initARScene);
         } else {
-            waitForARReady();
+            initARScene();
         }
     </script>
 </body>
