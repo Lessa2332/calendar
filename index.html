@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR Calendar Puzzle | Календар AR Пазли</title>
     
-    <!-- 🔥 Критично: завантажуємо скрипти без defer для стабільності -->
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <!-- 🔥 КРИТИЧНО: завантажуємо з defer для правильного порядку -->
+    <script defer src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -117,7 +117,6 @@
     </div>
 
     <div id="ar-container">
-        <!-- 🔥 ВИПРАВЛЕНО: CDN для .mind файлу та правильні параметри фільтра -->
         <a-scene 
             mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/lessa2332/your-calendar/calendar.mind; autoStart: false; uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.001; filterBeta: 1000;"
             embedded
@@ -245,23 +244,20 @@
                 this.setupEventListeners();
                 this.setupDragAndDrop();
 
-                // 🔥 Покращена перевірка ініціалізації
                 this.scene.addEventListener('loaded', () => {
                     try {
-                        // Даємо час на ініціалізацію компонентів
                         setTimeout(() => {
                             const mindarComp = this.scene.components['mindar-image'];
                             if (!mindarComp || typeof mindarComp.setup !== 'function') {
-                                throw new Error('MindAR component not ready - check console for CORS errors');
+                                throw new Error('MindAR component not ready');
                             }
 
-                            // Створюємо сцену
                             this.createTargetContainers();
                             this.createGrid();
 
                             document.getElementById('loading-screen').style.display = 'none';
                             document.getElementById('processing-info').textContent = "✅ AR Ready! Tap Start to begin";
-                        }, 1000);
+                        }, 800);
                     } catch (e) {
                         console.error('Init failed:', e);
                         document.getElementById('processing-info').textContent = `❌ Error: ${e.message}`;
@@ -356,7 +352,6 @@
             }
 
             async loadAndShowPuzzle(targetIndex) {
-                // 🔥 ВИПРАВЛЕНО: CDN для зображень пазлів
                 const url = `https://cdn.jsdelivr.net/gh/lessa2332/your-calendar/images/${String(targetIndex + 1).padStart(2, '0')}.jpg`;
                 const container = document.getElementById(`puzzle-container-${targetIndex}`);
                 while (container.firstChild) container.removeChild(container.firstChild);
@@ -501,13 +496,20 @@
             }
         }
 
-        // Запускаємо лише після повного завантаження DOM
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                window.puzzleGame = new ARPuzzleGame();
-            });
-        } else {
+        // 🔥 Надійна ініціалізація з перевіркою AFRAME
+        function initGame() {
+            if (typeof AFRAME === 'undefined') {
+                // Чекаємо завантаження A-Frame
+                setTimeout(initGame, 100);
+                return;
+            }
             window.puzzleGame = new ARPuzzleGame();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initGame);
+        } else {
+            initGame();
         }
     </script>
 </body>
