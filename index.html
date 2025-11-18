@@ -117,7 +117,6 @@
     </div>
 
     <div id="ar-container">
-        <!-- 🔥 Правильний <a-scene> для A-Frame 1.4.0 -->
         <a-scene 
             mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/lessa2332/your-calendar/calendar.mind; autoStart: false; uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.001; filterBeta: 1000;"
             embedded
@@ -490,19 +489,26 @@
             }
         }
 
-        // 🔥 Надійна ініціалізація
-        function initGame() {
-            if (typeof AFRAME === 'undefined') {
-                setTimeout(initGame, 100);
+        // 🔥 Безпечна ініціалізація: чекаємо, поки mindar-image зареєструється
+        function waitForARReady() {
+            const scene = document.querySelector('a-scene');
+            if (!scene) {
+                setTimeout(waitForARReady, 100);
                 return;
             }
-            window.puzzleGame = new ARPuzzleGame();
+
+            const checkInterval = setInterval(() => {
+                if (scene.components && scene.components['mindar-image']) {
+                    clearInterval(checkInterval);
+                    window.puzzleGame = new ARPuzzleGame();
+                }
+            }, 100);
         }
 
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initGame);
+            document.addEventListener('DOMContentLoaded', waitForARReady);
         } else {
-            initGame();
+            waitForARReady();
         }
     </script>
 </body>
