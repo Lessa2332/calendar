@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <title>Магічний пазл для зірочки</title>
 
-  <!-- ✅ ТІЛЬКИ безпечні CDN з правильним MIME та без unsafe-eval -->
+  <!-- ✅ ЄДИНА робоча комбінація 2025: без eval, з правильним MIME -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.6.0/dist/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mindar-image-aframe@2.2.1/dist/mindar-image-aframe.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 
   <style>
@@ -28,17 +28,15 @@
 </head>
 <body>
 
-  <div id="hint">Натисни на екран → покажи маркер → збирай пазл!</div>
+  <div id="hint">Натисни екран → покажи маркер → збирай пазл!</div>
   <div id="win"><span>УРААА!</span><br>Ти найкращий чарівник!</div>
 
-  <!-- ✅ Правильні назви пакету + filterTargetsInViewThreshold для стабільності -->
   <a-scene
     embedded
-    mindar-image="imageTargetSrc: ./calendar.mind; filterMinCF:0.0001; filterBeta:1000; warmupTolerance:5; uiLoading:no; uiError:no; uiScanning:no; autoStart:false"
+    mindar-image="imageTargetSrc: ./calendar.mind; autoStart:false; uiLoading:no; uiError:no; uiScanning:no; filterMinCF:0.0001; filterBeta:1000; warmupTolerance:5"
     renderer="colorManagement:true"
     vr-mode-ui="enabled:false"
     device-orientation-permission-ui="enabled:false">
-
     <a-camera></a-camera>
     <a-entity id="targets-container"></a-entity>
   </a-scene>
@@ -47,7 +45,10 @@
          src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3"></audio>
 
   <script>
-    // Створюємо 12 цілей (0–11)
+    let activeTargetIndex = null;
+    let clickHandler = null;
+
+    // Створюємо 12 цілей
     function createTargets() {
       const container = document.getElementById('targets-container');
       for (let i = 0; i < 12; i++) {
@@ -58,13 +59,12 @@
       }
     }
 
-    let activeTargetIndex = null;
-    let clickHandler = null;
-
+    // Запуск AR
     function startAR() {
       const scene = document.querySelector('a-scene');
-      const mindarSystem = scene.systems['mindar-image-system'];
+      const mindarSystem = scene.systems['mindar-image-system']; // ✅ Правильна назва для v1.2.5
       if (mindarSystem) mindarSystem.start();
+      document.getElementById('hint').textContent = 'Шукаю маркер...';
     }
 
     function onTargetFound(e) {
@@ -75,8 +75,8 @@
       setTimeout(() => createPuzzle(idx), 600);
     }
 
-    function onTargetLost(e) {
-      if (activeTargetIndex === e.detail.targetIndex) resetPuzzle();
+    function onTargetLost() {
+      if (activeTargetIndex !== null) resetPuzzle();
     }
 
     function resetPuzzle() {
@@ -95,17 +95,15 @@
     async function createPuzzle(targetIndex) {
       const img = new Image();
       img.src = `./images/${String(targetIndex + 1).padStart(2, '0')}.jpg?t=${Date.now()}`;
-
       await new Promise((res, rej) => {
         img.onload = res;
-        img.onerror = () => rej(new Error(`Не вдалося завантажити images/${targetIndex + 1}.jpg`));
+        img.onerror = () => rej(`Помилка завантаження зображення ${targetIndex + 1}`);
       });
 
       const pieceW = img.width / 3;
       const pieceH = img.height / 3;
       const scaleW = 0.5 / 3;
       const scaleH = (img.height / img.width) * 0.5 / 3;
-
       const container = document.getElementById(`target-${targetIndex}`);
       const pieces = [];
 
@@ -122,17 +120,17 @@
           plane.setAttribute('src', canvas.toDataURL('image/jpeg', 0.9));
           plane.setAttribute('width', scaleW * 2);
           plane.setAttribute('height', scaleH * 2);
-          plane.setAttribute('position', `${(Math.random()-0.5)*1.4} ${(Math.random()-0.5)*1.4} 0.02`);
+          plane.setAttribute('position', `${(Math.random() - 0.5) * 1.5} ${(Math.random() - 0.5) * 1.5} 0.02`);
           plane.setAttribute('data-target-x', (col - 1) * scaleW);
           plane.setAttribute('data-target-y', (1 - row) * scaleH);
-          plane.classList.add('piece', 'clickable');
+          plane.classList.add('piece');
           container.appendChild(plane);
           pieces.push(plane);
         }
       }
 
-      // Перемішуємо
-      for (let i = 0; i < 15; i++) {
+      // Перемішуємо (20 ітерацій для кращого ефекту)
+      for (let i = 0; i < 20; i++) {
         const a = Math.floor(Math.random() * 9);
         const b = Math.floor(Math.random() * 9);
         const posA = pieces[a].getAttribute('position');
@@ -141,30 +139,30 @@
         pieces[b].setAttribute('position', posA);
       }
 
-      // Клік по шматочку
+      // Обробник кліків
       clickHandler = (e) => {
         const piece = e.detail.intersectedEl;
         if (!piece || !piece.classList.contains('piece')) return;
 
         const others = pieces.filter(p => p !== piece);
-        const swap = pieces[Math.floor(Math.random() * others.length)];
+        const swapWith = others[Math.floor(Math.random() * others.length)];
 
         const tmp = piece.getAttribute('position');
-        piece.setAttribute('position', swap.getAttribute('position'));
-        swap.setAttribute('position', tmp);
+        piece.setAttribute('position', swapWith.getAttribute('position'));
+        swapWith.setAttribute('position', tmp);
 
-        // Перевірка перемоги
+        // Перевірка перемоги (допуск 0.09 для стабільності)
         const solved = pieces.every(p => {
           const pos = p.getAttribute('position');
           const tx = parseFloat(p.getAttribute('data-target-x'));
           const ty = parseFloat(p.getAttribute('data-target-y'));
-          return Math.abs(pos.x - tx) < 0.08 && Math.abs(pos.y - ty) < 0.08;
+          return Math.abs(pos.x - tx) < 0.09 && Math.abs(pos.y - ty) < 0.09;
         });
 
         if (solved) {
           document.getElementById('win').style.display = 'flex';
           document.getElementById('yay').play().catch(() => {});
-          confetti({ particleCount: 600, spread: 120, origin: { y: 0.6 } });
+          confetti({ particleCount: 800, spread: 130, origin: { y: 0.6 } });
           document.querySelector('a-scene').removeEventListener('click', clickHandler);
           clickHandler = null;
         }
@@ -173,17 +171,13 @@
       document.querySelector('a-scene').addEventListener('click', clickHandler);
     }
 
-    // === Запуск усього після завантаження A-Frame ===
+    // Ініціалізація після завантаження A-Frame
     document.querySelector('a-scene').addEventListener('loaded', () => {
       createTargets();
-
       const sceneEl = document.querySelector('a-scene');
       sceneEl.addEventListener('targetFound', onTargetFound);
       sceneEl.addEventListener('targetLost', onTargetLost);
-
-      // Один клік — старт AR
       document.body.addEventListener('click', startAR, { once: true });
-
       document.getElementById('hint').textContent = 'Готово! Натисни екран і покажи маркер ✨';
     });
   </script>
