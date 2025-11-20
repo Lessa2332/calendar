@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <title>Магічний пазл для зірочки</title>
 
-  <!-- ✅ CSP-safe комбінація 2025: A-Frame + MindAR 1.2.5 -->
+  <!-- ✅ A-Frame + MindAR 1.2.5 (остання сумісна версія) -->
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
@@ -29,35 +29,27 @@
       position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
       color:#fff; font-size:20px; z-index:1001; text-align:center;
     }
-    
-    #cameraPreview {
-      position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:0;
-      display:none;
-    }
   </style>
 </head>
 <body>
 
-  <video id="cameraPreview" playsinline muted autoplay></video>
   <div id="hint">Натисни на екран → покажи маркер → збирай пазл!</div>
   <div id="win"><span>УРААА!</span><br>Ти найкращий чарівник!</div>
   <div id="loading">Завантаження...</div>
 
+  <!-- ✅ MindAR сам керує відеопотоком — не потрібен власний <video> -->
   <a-scene
-    embedded
-    mindar-image="imageTargetSrc: ./calendar.mind; filterMinCF:0.0001; filterBeta:1000; warmupTolerance:5; uiLoading:no; uiError:no; uiScanning:no; autoStart:false"
-    renderer="colorManagement:true; legacyLights: false"
-    vr-mode-ui="enabled:false"
-    device-orientation-permission-ui="enabled:false">
-    
-    <a-camera 
-      active="false"
-      raycaster="objects: .piece; far: 100"
-      cursor="fuse: false; rayOrigin: mouse">
-    </a-camera>
+    mindar-image="imageTargetSrc: ./calendar.mind; autoStart: true; maxTrack: 1"
+    renderer="colorManagement: true"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false"
+    arjs="sourceType: webcam; debugUIEnabled: false">
+
+    <a-camera></a-camera>
     <a-entity id="targets-container"></a-entity>
   </a-scene>
 
+  <!-- Короткий звук "ура!" -->
   <audio id="yay" preload="auto">
     <source src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAA==" type="audio/wav">
   </audio>
@@ -67,17 +59,18 @@
     let clickHandler = null;
     let targetsCreated = false;
     let userInteracted = false;
-    let cameraStream = null;
 
+    // Розблокування аудіо після першого кліку
     function unlockAudio() {
-        if (userInteracted) return;
-        userInteracted = true;
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        ctx.resume();
-        const sounds = document.querySelectorAll('audio');
-        sounds.forEach(s => { s.play().catch(()=>{}); s.pause(); s.currentTime = 0; });
+      if (userInteracted) return;
+      userInteracted = true;
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      ctx.resume();
+      const sounds = document.querySelectorAll('audio');
+      sounds.forEach(s => { s.play().catch(()=>{}); s.pause(); s.currentTime = 0; });
     }
 
+    // Створення 12 цілей для маркерів
     function createTargets() {
       if (targetsCreated) return;
       const container = document.getElementById('targets-container');
@@ -91,84 +84,7 @@
       console.log('✅ Цілі створені');
     }
 
-    async function startAR() {
-      console.log('🚀 Запуск AR...');
-      
-      try {
-        // Спочатку отримуємо доступ до камери
-        cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: { 
-            facingMode: 'environment',
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
-        });
-        
-        // Показуємо прев'ю камери
-        const cameraPreview = document.getElementById('cameraPreview');
-        cameraPreview.srcObject = cameraStream;
-        cameraPreview.style.display = 'block';
-        
-        console.log('✅ Камера успішно підключена');
-
-        const scene = document.querySelector('a-scene');
-        const mindarComponent = scene.components['mindar-image'];
-
-        if (!mindarComponent) {
-          console.error('❌ Компонент mindar-image не знайдено!');
-          document.getElementById('hint').textContent = 'Помилка: MindAR не завантажено';
-          document.getElementById('loading').style.display = 'none';
-          return;
-        }
-
-        if (mindarComponent.arSession) {
-          console.log('✅ AR вже запущено');
-          return;
-        }
-
-        // Запускаємо MindAR після успішного отримання камери
-        mindarComponent.start().then(() => {
-          console.log('✅ AR успішно запущено');
-          document.getElementById('hint').textContent = 'Покажи маркер камері! 📱';
-          document.getElementById('loading').style.display = 'none';
-          
-          // Активуємо камеру A-Frame після запуску MindAR
-          const aframeCamera = document.querySelector('a-camera');
-          aframeCamera.setAttribute('active', 'true');
-          
-        }).catch(err => {
-          console.error('❌ Помилка запуску AR:', err);
-          document.getElementById('hint').textContent = '❌ Помилка AR! Перезавантаж сторінку.';
-          document.getElementById('loading').style.display = 'none';
-        });
-
-      } catch (err) {
-        console.error('❌ Помилка доступу до камери:', err);
-        document.getElementById('hint').textContent = '❌ Дозволь доступ до камери! Натисни знову.';
-        document.getElementById('loading').style.display = 'none';
-        
-        // Дозволяємо спробувати ще раз
-        userInteracted = false;
-      }
-    }
-
-    function onTargetFound(e) {
-      const idx = e.detail.targetIndex;
-      console.log(`🎯 Знайдено ціль: ${idx}`);
-      if (activeTargetIndex === idx) return;
-      resetPuzzle();
-      activeTargetIndex = idx;
-      setTimeout(() => createPuzzle(idx), 300);
-    }
-
-    function onTargetLost(e) {
-      console.log(`❌ Втрачено ціль: ${e.detail.targetIndex}`);
-      if (activeTargetIndex === e.detail.targetIndex) {
-        resetPuzzle();
-      }
-    }
-
+    // Очищення пазлу
     function resetPuzzle() {
       if (clickHandler) {
         document.querySelector('a-scene').removeEventListener('click', clickHandler);
@@ -182,6 +98,7 @@
       document.getElementById('win').style.display = 'none';
     }
 
+    // Створення пазлу на знайденому маркері
     function createPuzzle(targetIndex) {
       const container = document.getElementById(`target-${targetIndex}`);
       if (!container) return;
@@ -244,6 +161,7 @@
       console.log(`✅ Пазл створено для цілі ${targetIndex}`);
     }
 
+    // Перевірка, чи пазл зібрано
     function checkPuzzleSolved(pieces) {
       const solved = pieces.every(piece => {
         const pos = piece.getAttribute('position');
@@ -276,41 +194,41 @@
       }
     }
 
-    function cleanup() {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-      }
+    // Події виявлення маркерів
+    function onTargetFound(e) {
+      const idx = e.detail.targetIndex;
+      console.log(`🎯 Знайдено ціль: ${idx}`);
+      if (activeTargetIndex === idx) return;
       resetPuzzle();
+      activeTargetIndex = idx;
+      setTimeout(() => createPuzzle(idx), 300);
     }
 
-    // Ініціалізація після завантаження сцени
+    function onTargetLost(e) {
+      console.log(`❌ Втрачено ціль: ${e.detail.targetIndex}`);
+      if (activeTargetIndex === e.detail.targetIndex) {
+        resetPuzzle();
+      }
+    }
+
+    // Головна ініціалізація
     document.querySelector('a-scene').addEventListener('loaded', () => {
       console.log('🎬 Сцена завантажена');
-
       createTargets();
 
       const sceneEl = document.querySelector('a-scene');
       sceneEl.addEventListener('targetFound', onTargetFound);
       sceneEl.addEventListener('targetLost', onTargetLost);
 
-      document.body.addEventListener('click', () => {
-        unlockAudio();
-        startAR();
-      }, { once: true });
+      // Перший клік — для розблокування аудіо (і, можливо, ініціалізації на деяких пристроях)
+      document.body.addEventListener('click', unlockAudio, { once: true });
 
-      document.getElementById('hint').textContent = 'Натисни на екран для запуску камери!';
       document.getElementById('loading').style.display = 'none';
+      document.getElementById('hint').textContent = 'Покажи маркер камері! 📱';
     });
 
-    document.querySelector('a-scene').addEventListener('error', (e) => {
-      console.error('❌ Помилка завантаження сцени:', e);
-      document.getElementById('hint').textContent = 'Помилка завантаження AR!';
-      document.getElementById('loading').style.display = 'none';
-    });
-
-    // Прибирання при закритті сторінки
-    window.addEventListener('beforeunload', cleanup);
-    window.addEventListener('pagehide', cleanup);
+    // Прибирання при закритті
+    window.addEventListener('beforeunload', resetPuzzle);
   </script>
 </body>
 </html>
