@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <title>Магічний пазл для зірочки</title>
 
-  <!-- ✅ CSP-safe бібліотеки (офіційні npm-пакети, без eval, без ORB) -->
-  <script src="https://cdn.jsdelivr.net/npm/aframe@1.6.0/dist/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mindar-image-aframe@1.2.2/dist/mindar-image-aframe.prod.js"></script>
+  <!-- ✅ CSP-safe комбінація 2025: aframe.io (глобальний AFRAME) + mind-ar@1.2.5 (без eval) -->
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 
   <style>
@@ -37,7 +37,6 @@
     renderer="colorManagement:true"
     vr-mode-ui="enabled:false"
     device-orientation-permission-ui="enabled:false">
-
     <a-camera></a-camera>
     <a-entity id="targets-container"></a-entity>
   </a-scene>
@@ -46,6 +45,9 @@
          src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3"></audio>
 
   <script>
+    let activeTargetIndex = null;
+    let clickHandler = null;
+
     // Створюємо 12 цілей (0–11)
     function createTargets() {
       const container = document.getElementById('targets-container');
@@ -57,13 +59,10 @@
       }
     }
 
-    let activeTargetIndex = null;
-    let clickHandler = null;
-
-    // ✅ Запуск AR після кліку (обов’язково для дозволу камери)
+    // Запуск AR після кліку (обов’язково для дозволу камери)
     function startAR() {
       const scene = document.querySelector('a-scene');
-      const mindarSystem = scene.systems?.['mindar-image-system']; // ✅ Правильно для 2025
+      const mindarSystem = scene.systems['mindar-image-system']; // ✅ Правильно для mind-ar@1.2.5
       if (mindarSystem && !mindarSystem.initialized) {
         mindarSystem.start().catch(err => {
           console.error('AR запуск не вдався:', err);
@@ -99,8 +98,7 @@
 
     async function createPuzzle(targetIndex) {
       const img = new Image();
-      img.src = `./images/${String(targetIndex + 1).padStart(2, '0')}.jpg?_=${Date.now()}`;
-
+      img.src = `./images/${String(targetIndex + 1).padStart(2, '0')}.jpg?t=${Date.now()}`;
       await new Promise((res, rej) => {
         img.onload = res;
         img.onerror = () => rej(new Error(`Не вдалося завантажити images/${targetIndex + 1}.jpg`));
@@ -110,7 +108,6 @@
       const pieceH = img.height / 3;
       const scaleW = 0.5 / 3;
       const scaleH = (img.height / img.width) * 0.5 / 3;
-
       const container = document.getElementById(`target-${targetIndex}`);
       const pieces = [];
 
@@ -123,7 +120,7 @@
           ctx.drawImage(img, col * pieceW, row * pieceH, pieceW, pieceH, 0, 0, pieceW, pieceH);
 
           const plane = document.createElement('a-plane');
-          plane.setAttribute('src', canvas.toDataURL()); // ✅ Без формату — безпечніше
+          plane.setAttribute('src', canvas.toDataURL('image/jpeg', 0.9)); // ✅ З форматом для оптимізації
           plane.setAttribute('width', scaleW * 2);
           plane.setAttribute('height', scaleH * 2);
           plane.setAttribute('position', `${(Math.random()-0.5)*1.4} ${(Math.random()-0.5)*1.4} 0.02`);
@@ -149,15 +146,14 @@
       clickHandler = (e) => {
         const piece = e.detail.intersectedEl;
         if (!piece || !piece.classList.contains('piece')) return;
-
         const others = pieces.filter(p => p !== piece);
         if (others.length === 0) return;
         const swap = others[Math.floor(Math.random() * others.length)];
-
         const tmp = piece.getAttribute('position');
         piece.setAttribute('position', swap.getAttribute('position'));
         swap.setAttribute('position', tmp);
 
+        // Перевірка перемоги
         const solved = pieces.every(p => {
           const pos = p.getAttribute('position');
           const tx = parseFloat(p.getAttribute('data-target-x'));
@@ -173,20 +169,16 @@
           clickHandler = null;
         }
       };
-
       document.querySelector('a-scene').addEventListener('click', clickHandler);
     }
 
-    // ✅ Ініціалізація після повного завантаження A-Frame
+    // Ініціалізація після повного завантаження A-Frame
     document.querySelector('a-scene').addEventListener('loaded', () => {
       createTargets();
-
       const sceneEl = document.querySelector('a-scene');
       sceneEl.addEventListener('targetFound', onTargetFound);
       sceneEl.addEventListener('targetLost', onTargetLost);
-
       document.body.addEventListener('click', startAR, { once: true });
-
       document.getElementById('hint').textContent = 'Готово! Натисни екран і покажи маркер ✨';
     });
   </script>
