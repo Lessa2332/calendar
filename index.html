@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <title>Магічний пазл для зірочки</title>
 
-  <!-- ✅ CSP-safe бібліотеки з npm (НЕ з aframe.io / gh) -->
+  <!-- ✅ CSP-safe бібліотеки з npm (не з aframe.io / gh) -->
   <script src="https://cdn.jsdelivr.net/npm/aframe@1.6.0/dist/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mindar@2.2.1/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
@@ -71,7 +71,7 @@
 
 </a-scene>
 
-<audio id="yay" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3" preload="auto"></audio>
+<audio id="yay" crossorigin="anonymous" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3" preload="auto"></audio>
 
 <script>
 // Створюємо 12 цілей для маркерів 0–11
@@ -145,7 +145,6 @@ async function createPuzzle(targetIndex) {
   const pieces = [];
   const container = document.getElementById(`target-${targetIndex}`);
 
-  // Створення шматочків
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
       const canvas = document.createElement('canvas');
@@ -190,7 +189,6 @@ async function createPuzzle(targetIndex) {
     piece.setAttribute('position', other.getAttribute('position'));
     other.setAttribute('position', tmp);
 
-    // Перевірка перемоги
     const isSolved = pieces.every(p => {
       const pos = p.getAttribute('position');
       const tx = parseFloat(p.getAttribute('data-target-x'));
@@ -210,7 +208,7 @@ async function createPuzzle(targetIndex) {
   document.querySelector('a-scene').addEventListener('click', clickHandler);
 }
 
-// ✅ Ініціалізація після завантаження A-Frame
+// ✅ Ініціалізація ПІСЛЯ повного завантаження A-Frame
 document.querySelector('a-scene').addEventListener('loaded', () => {
   createTargets();
   const scene = document.querySelector('a-scene');
