@@ -29,10 +29,16 @@
       position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
       color:#fff; font-size:20px; z-index:1001; text-align:center;
     }
+    
+    #cameraPreview {
+      position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:0;
+      display:none;
+    }
   </style>
 </head>
 <body>
 
+  <video id="cameraPreview" playsinline muted autoplay></video>
   <div id="hint">Натисни на екран → покажи маркер → збирай пазл!</div>
   <div id="win"><span>УРААА!</span><br>Ти найкращий чарівник!</div>
   <div id="loading">Завантаження...</div>
@@ -45,6 +51,7 @@
     device-orientation-permission-ui="enabled:false">
     
     <a-camera 
+      active="false"
       raycaster="objects: .piece; far: 100"
       cursor="fuse: false; rayOrigin: mouse">
     </a-camera>
@@ -59,6 +66,17 @@
     let activeTargetIndex = null;
     let clickHandler = null;
     let targetsCreated = false;
+    let userInteracted = false;
+    let cameraStream = null;
+
+    function unlockAudio() {
+        if (userInteracted) return;
+        userInteracted = true;
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        ctx.resume();
+        const sounds = document.querySelectorAll('audio');
+        sounds.forEach(s => { s.play().catch(()=>{}); s.pause(); s.currentTime = 0; });
+    }
 
     function createTargets() {
       if (targetsCreated) return;
@@ -73,32 +91,66 @@
       console.log('✅ Цілі створені');
     }
 
-    function startAR() {
+    async function startAR() {
       console.log('🚀 Запуск AR...');
-      const scene = document.querySelector('a-scene');
-      const mindarComponent = scene.components['mindar-image'];
+      
+      try {
+        // Спочатку отримуємо доступ до камери
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        });
+        
+        // Показуємо прев'ю камери
+        const cameraPreview = document.getElementById('cameraPreview');
+        cameraPreview.srcObject = cameraStream;
+        cameraPreview.style.display = 'block';
+        
+        console.log('✅ Камера успішно підключена');
 
-      if (!mindarComponent) {
-        console.error('❌ Компонент mindar-image не знайдено!');
-        document.getElementById('hint').textContent = 'Помилка: MindAR не завантажено';
+        const scene = document.querySelector('a-scene');
+        const mindarComponent = scene.components['mindar-image'];
+
+        if (!mindarComponent) {
+          console.error('❌ Компонент mindar-image не знайдено!');
+          document.getElementById('hint').textContent = 'Помилка: MindAR не завантажено';
+          document.getElementById('loading').style.display = 'none';
+          return;
+        }
+
+        if (mindarComponent.arSession) {
+          console.log('✅ AR вже запущено');
+          return;
+        }
+
+        // Запускаємо MindAR після успішного отримання камери
+        mindarComponent.start().then(() => {
+          console.log('✅ AR успішно запущено');
+          document.getElementById('hint').textContent = 'Покажи маркер камері! 📱';
+          document.getElementById('loading').style.display = 'none';
+          
+          // Активуємо камеру A-Frame після запуску MindAR
+          const aframeCamera = document.querySelector('a-camera');
+          aframeCamera.setAttribute('active', 'true');
+          
+        }).catch(err => {
+          console.error('❌ Помилка запуску AR:', err);
+          document.getElementById('hint').textContent = '❌ Помилка AR! Перезавантаж сторінку.';
+          document.getElementById('loading').style.display = 'none';
+        });
+
+      } catch (err) {
+        console.error('❌ Помилка доступу до камери:', err);
+        document.getElementById('hint').textContent = '❌ Дозволь доступ до камери! Натисни знову.';
         document.getElementById('loading').style.display = 'none';
-        return;
+        
+        // Дозволяємо спробувати ще раз
+        userInteracted = false;
       }
-
-      if (mindarComponent.arSession) {
-        console.log('✅ AR вже запущено');
-        return;
-      }
-
-      mindarComponent.start().then(() => {
-        console.log('✅ AR успішно запущено');
-        document.getElementById('hint').textContent = 'Покажи маркер камері! 📱';
-        document.getElementById('loading').style.display = 'none';
-      }).catch(err => {
-        console.error('❌ Помилка запуску AR:', err);
-        document.getElementById('hint').textContent = '❌ Помилка камери! Перезавантаж сторінку.';
-        document.getElementById('loading').style.display = 'none';
-      });
     }
 
     function onTargetFound(e) {
@@ -224,6 +276,13 @@
       }
     }
 
+    function cleanup() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+      resetPuzzle();
+    }
+
     // Ініціалізація після завантаження сцени
     document.querySelector('a-scene').addEventListener('loaded', () => {
       console.log('🎬 Сцена завантажена');
@@ -235,6 +294,7 @@
       sceneEl.addEventListener('targetLost', onTargetLost);
 
       document.body.addEventListener('click', () => {
+        unlockAudio();
         startAR();
       }, { once: true });
 
@@ -247,6 +307,10 @@
       document.getElementById('hint').textContent = 'Помилка завантаження AR!';
       document.getElementById('loading').style.display = 'none';
     });
+
+    // Прибирання при закритті сторінки
+    window.addEventListener('beforeunload', cleanup);
+    window.addEventListener('pagehide', cleanup);
   </script>
 </body>
 </html>
