@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Магічний пазл для зірочки</title>
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
@@ -12,16 +12,14 @@
     body, html {margin:0; height:100%; overflow:hidden; background:#000; font-family:'Comic Sans MS',cursive,sans-serif;}
     
     /* КАМЕРА ВИДНО! */
-    .mindar-video-container video, video, canvas + video {
-      display: block !important; position: fixed !important; top:0; left:0; width:100% !important; height:100% !important;
-      object-fit: cover !important; z-index:-2 !important;
-    }
+    .mindar-ui-overlay, .mindar-ui-loading, .mindar-ui-scanning { display: none !important; }
+    
     a-scene, .a-canvas {background:transparent !important;}
 
     #hint, #counter {
       position:fixed; padding:16px 32px; border-radius:50px; font-size:24px; z-index:999; color:#fff; box-shadow:0 0 30px #ff1493;
     }
-    #hint {top:20px; left:50%; transform:translateX(-50%); background:#ff1493;}
+    #hint {top:20px; left:50%; transform:translateX(-50%); background:#ff1493; text-align:center;}
     #counter {top:80px; left:20px; background:rgba(255,20,147,0.8);}
     
     #win {position:fixed; inset:0; background:rgba(0,0,0,0.97); color:gold; font-size:80px;
@@ -29,24 +27,33 @@
     #win span {animation:bounce 1s infinite;}
     @keyframes bounce {0%,100%{transform:scale(1)} 50%{transform:scale(1.5)}}
     #loading {position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); color:#fff; font-size:20px; z-index:1001;}
+    
+    #startButton {
+      position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+      background:#ff1493; color:white; border:none; padding:20px 40px;
+      border-radius:50px; font-size:24px; cursor:pointer; z-index:1002;
+      box-shadow:0 0 30px #ff1493;
+    }
   </style>
 </head>
 <body>
-  <div id="hint">Покажи маркер камері → перетягуй шматочки!</div>
-  <div id="counter">Зібрано: 0 з 12</div>
+  <div id="hint" style="display:none;">Покажи маркер камері → перетягуй шматочки!</div>
+  <div id="counter" style="display:none;">Зібрано: 0 з 12</div>
   <div id="win"><span>УРААА!</span><br>Ти найкращий чарівник!</div>
   <div id="loading">Завантажуємо магію...</div>
+  <button id="startButton">🎮 ПОЧАТИ ГРУ 🎮</button>
 
   <a-scene
     embedded
-    mindar-image="imageTargetSrc: calendar.mind; filterMinCF:0.0001; filterBeta:0.01;"
+    mindar-image="imageTargetSrc: calendar.mind; filterMinCF:0.0001; filterBeta:0.01; autoStart: false; showBackground: true;"
     renderer="colorManagement: true; antialias: true"
     vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false">
 
-    <!-- ВКЛЮЧАЄМО ФОН КАМЕРИ -->
-    <a-entity mindar-image-system="showBackground: true;"></a-entity>
-    <a-camera></a-camera>
+    <a-camera 
+      raycaster="objects: .puzzle-piece; far: 100"
+      cursor="fuse: false; rayOrigin: mouse">
+    </a-camera>
 
     <!-- 12 маркерів -->
     <a-entity id="target-0"  mindar-image-target="targetIndex: 0"></a-entity>
@@ -66,66 +73,129 @@
   <audio id="yay" preload="auto"></audio>
 
   <script>
+    // === ПРОСТИЙ DRAG COMPONENT ===
     AFRAME.registerComponent('drag-puzzle-piece', {
       init: function () {
-        const el = this.el;
-        let startPos = null;
-        let currentTarget = null;
-
-        const start = (e) => {
-          if (activeTarget === null || puzzleStates[activeTarget]?.solved) return;
-          e.preventDefault();
-          startPos = el.getAttribute('position');
-          currentTarget = activeTarget;
-          el.setAttribute('material', 'opacity', 0.8);
-        };
-
-        const move = (e) => {
-          if (currentTarget !== activeTarget) return;
-          const touch = e.touches ? e.touches[0] : e;
-          const hit = document.querySelector('a-scene').systems['mindar-image-system'].getHitPoint(touch.clientX, touch.clientY);
-          if (hit) el.setAttribute('position', {x: hit.x, y: hit.y, z: 0.05});
-        };
-
-        const end = () => {
-          if (currentTarget !== activeTarget) return;
-          el.setAttribute('material', 'opacity', 1);
-
-          const tx = parseFloat(el.dataset.tx);
-          const ty = parseFloat(el.dataset.ty);
-          const pos = el.getAttribute('position');
-          const dist = Math.hypot(pos.x - tx, pos.y - ty);
-
-          if (dist < 0.1) {
-            el.setAttribute('position', {x: tx, y: ty, z: 0.02});
-            el.setAttribute('rotation', '0 0 0');
-            el.emit('snap');
-          } else {
-            el.setAttribute('animation', `property: position; to: ${startPos.x} ${startPos.y} 0.05; dur: 400; easing: easeOutElastic`);
-          }
-          checkIfSolved(activeTarget);
-        };
-
-        el.addEventListener('mousedown', start);
-        el.addEventListener('touchstart', start);
-        document.addEventListener('mousemove', move);
-        document.addEventListener('touchmove', move);
-        document.addEventListener('mouseup', end);
-        document.addEventListener('touchend', end);
+        this.el.classList.add('puzzle-piece');
+        this.dragging = false;
+        this.startPosition = new THREE.Vector3();
+        this.mouseStart = new THREE.Vector2();
+      },
+      
+      events: {
+        mousedown: function (evt) {
+          if (!window.activeTarget) return;
+          this.dragging = true;
+          this.startPosition.copy(this.el.object3D.position);
+          this.mouseStart.set(evt.detail.intersection.uv.x, evt.detail.intersection.uv.y);
+          this.el.setAttribute('material', 'opacity', 0.8);
+          document.querySelector('a-scene').setAttribute('cursor', 'fuse: false');
+        },
+        
+        touchstart: function (evt) {
+          this.events.mousedown.call(this, evt);
+        }
+      },
+      
+      tick: function() {
+        if (!this.dragging || !window.lastMousePos) return;
+        
+        // Отримуємо різницю руху миші
+        const camera = document.querySelector('[camera]').object3D;
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        
+        mouse.x = (window.lastMousePos.x / window.innerWidth) * 2 - 1;
+        mouse.y = - (window.lastMousePos.y / window.innerHeight) * 2 + 1;
+        
+        raycaster.setFromCamera(mouse, camera);
+        
+        // Знаходимо площину для переміщення
+        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0.05);
+        const intersectionPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, intersectionPoint);
+        
+        if (intersectionPoint) {
+          this.el.object3D.position.copy(intersectionPoint);
+        }
+      },
+      
+      remove: function() {
+        this.dragging = false;
+        document.querySelector('a-scene').setAttribute('cursor', 'fuse: true');
       }
     });
 
+    // === ГЛОБАЛЬНІ ЗМІННІ ===
     let activeTarget = null;
     let puzzleStates = {};
     let solvedCount = 0;
     const imageCache = {};
+    let lastMousePos = null;
 
+    // === ОБРОБКА ПОДІЙ МИШІ/ТАЧУ ===
+    document.addEventListener('mousemove', (e) => {
+      lastMousePos = { x: e.clientX, y: e.clientY };
+    });
+
+    document.addEventListener('touchmove', (e) => {
+      if (e.touches[0]) {
+        lastMousePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    // === КІНЕЦЬ ПЕРЕТЯГУВАННЯ ===
+    document.addEventListener('mouseup', () => {
+      const pieces = document.querySelectorAll('.puzzle-piece');
+      pieces.forEach(piece => {
+        const comp = piece.components['drag-puzzle-piece'];
+        if (comp && comp.dragging) {
+          comp.dragging = false;
+          piece.setAttribute('material', 'opacity', 1);
+          document.querySelector('a-scene').setAttribute('cursor', 'fuse: true');
+          
+          // Перевіряємо чи шматочок на місці
+          const tx = parseFloat(piece.dataset.tx);
+          const ty = parseFloat(piece.dataset.ty);
+          const pos = piece.object3D.position;
+          const dist = Math.hypot(pos.x - tx, pos.y - ty);
+
+          if (dist < 0.08) {
+            // Шматочок на місці
+            piece.object3D.position.set(tx, ty, 0.02);
+            piece.object3D.rotation.set(0, 0, 0);
+            checkIfSolved(window.activeTarget);
+          } else {
+            // Повертаємо на початкову позицію
+            piece.setAttribute('animation', {
+              property: 'position',
+              to: `${comp.startPosition.x} ${comp.startPosition.y} 0.05`,
+              dur: 500,
+              easing: 'easeOutElastic'
+            });
+          }
+        }
+      });
+    });
+
+    document.addEventListener('touchend', () => {
+      document.dispatchEvent(new Event('mouseup'));
+    });
+
+    // === СТВОРЕННЯ ПАЗЛУ ===
     function createPuzzle(index) {
       const container = document.getElementById(`target-${index}`);
-      if (puzzleStates[index]?.solved) { showSolved(index); return; }
+      if (puzzleStates[index]?.solved) { 
+        showSolved(index); 
+        return; 
+      }
 
       const url = `images/${String(index+1).padStart(2,'0')}.jpg?t=${Date.now()}`;
-      if (imageCache[url]) { buildPieces(imageCache[url], index); return; }
+      if (imageCache[url]) { 
+        buildPieces(imageCache[url], index); 
+        return; 
+      }
 
       const img = new Image();
       img.crossOrigin = "anonymous";
@@ -141,16 +211,39 @@
     function sliceImage(img) {
       const pieces = [];
       const rows = 3, cols = 3;
-      const pw = img.width / cols, ph = img.height / rows;
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
+      const pieceWidth = 0.26;
+      const pieceHeight = (img.height / img.width) * pieceWidth;
+      const spacing = 0.01;
+      
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
           const canvas = document.createElement('canvas');
-          canvas.width = pw; canvas.height = ph;
-          canvas.getContext('2d').drawImage(img, c*pw, r*ph, pw, ph, 0, 0, pw, ph);
+          const ctx = canvas.getContext('2d');
+          
+          // Розміри шматочка
+          const srcWidth = img.width / cols;
+          const srcHeight = img.height / rows;
+          
+          canvas.width = srcWidth;
+          canvas.height = srcHeight;
+          
+          // Вирізаємо шматочок
+          ctx.drawImage(
+            img,
+            col * srcWidth, row * srcHeight, srcWidth, srcHeight,
+            0, 0, srcWidth, srcHeight
+          );
+          
+          // Цільова позиція (зібраний пазл)
+          const targetX = (col - 1) * (pieceWidth + spacing);
+          const targetY = (1 - row) * (pieceHeight + spacing);
+          
           pieces.push({
             src: canvas.toDataURL(),
-            tx: (c - 1) * 0.27,     // від -0.54 до +0.54 → гарний розмір
-            ty: (1 - r) * 0.27      // від +0.54 до -0.54
+            tx: targetX,
+            ty: targetY,
+            width: pieceWidth,
+            height: pieceHeight
           });
         }
       }
@@ -160,90 +253,168 @@
     function buildPieces(piecesData, idx) {
       const container = document.getElementById(`target-${idx}`);
       container.innerHTML = '';
-      const saved = puzzleStates[idx]?.positions || shuffle(piecesData);
+      
+      // Отримуємо збережений стан або перемішуємо
+      const savedState = puzzleStates[idx]?.positions || shufflePieces(piecesData);
 
-      saved.forEach(p => {
+      savedState.forEach((pieceData, index) => {
         const plane = document.createElement('a-plane');
-        plane.setAttribute('src', p.src);
-        plane.setAttribute('width', 0.26);
-        plane.setAttribute('height', 0.26);
-        plane.setAttribute('position', `${p.x || (Math.random()-0.5)*0.9} ${p.y || (Math.random()-0.5)*0.9} 0.05`);
+        plane.setAttribute('src', pieceData.src);
+        plane.setAttribute('width', pieceData.width);
+        plane.setAttribute('height', pieceData.height);
+        plane.setAttribute('position', `${pieceData.x} ${pieceData.y} 0.05`);
         plane.setAttribute('drag-puzzle-piece', '');
-        plane.setAttribute('data-tx', p.tx);
-        plane.setAttribute('data-ty', p.ty);
-        plane.classList.add('clickable');
+        plane.setAttribute('data-tx', pieceData.tx);
+        plane.setAttribute('data-ty', pieceData.ty);
+        plane.setAttribute('data-index', index);
         container.appendChild(plane);
       });
 
-      puzzleStates[idx] = { positions: saved, solved: false };
+      puzzleStates[idx] = { 
+        positions: savedState, 
+        solved: false 
+      };
     }
 
-    function shuffle(arr) {
-      const copy = arr.map(p => ({...p}));
-      for (let i = copy.length-1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i+1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
+    function shufflePieces(pieces) {
+      const shuffled = [...pieces];
+      
+      // Перемішуємо позиції
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
       }
-      copy.forEach(p => { p.x = (Math.random()-0.5)*1; p.y = (Math.random()-0.5)*1; });
-      return copy;
+      
+      // Додаємо випадкові позиції для кожного шматочка
+      shuffled.forEach((piece, index) => {
+        piece.x = (Math.random() - 0.5) * 1.2; // -0.6 до +0.6
+        piece.y = (Math.random() - 0.5) * 1.2; // -0.6 до +0.6
+      });
+      
+      return shuffled;
     }
 
     function checkIfSolved(idx) {
-      const pieces = document.querySelectorAll(`#target-${idx} a-plane`);
-      const ok = Array.from(pieces).every(p => {
-        const pos = p.getAttribute('position');
-        return Math.abs(pos.x - parseFloat(p.dataset.tx)) < 0.08 &&
-               Math.abs(pos.y - parseFloat(p.dataset.ty)) < 0.08;
+      if (!window.activeTarget || activeTarget !== idx) return;
+      
+      const pieces = document.querySelectorAll(`#target-${idx} .puzzle-piece`);
+      let allCorrect = true;
+      
+      pieces.forEach(piece => {
+        const pos = piece.object3D.position;
+        const targetX = parseFloat(piece.dataset.tx);
+        const targetY = parseFloat(piece.dataset.ty);
+        const dist = Math.hypot(pos.x - targetX, pos.y - targetY);
+        
+        if (dist >= 0.08) {
+          allCorrect = false;
+        }
       });
 
-      if (ok && !puzzleStates[idx].solved) {
+      if (allCorrect && !puzzleStates[idx].solved) {
         puzzleStates[idx].solved = true;
         solvedCount++;
         document.getElementById('counter').textContent = `Зібрано: ${solvedCount} з 12`;
-        document.getElementById('yay').src = `fon/${String(idx+1).padStart(2,'0')}.mp3`;
-        document.getElementById('yay').play();
-        confetti({particleCount: 400, spread: 100});
-        if (solvedCount === 12) setTimeout(() => document.getElementById('win').style.display='flex', 1200);
+        
+        // Спроба відтворити звук
+        try {
+          const audio = document.getElementById('yay');
+          audio.src = `fon/${String(idx+1).padStart(2,'0')}.mp3`;
+          audio.play().catch(e => console.log('🔇 Звук не відтворився'));
+        } catch(e) {}
+        
+        // Конфетті
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+        
+        if (solvedCount === 12) {
+          setTimeout(() => {
+            document.getElementById('win').style.display = 'flex';
+          }, 1000);
+        }
       }
     }
 
     function showSolved(idx) {
       const container = document.getElementById(`target-${idx}`);
+      container.innerHTML = '';
+      
       const img = document.createElement('a-image');
       img.setAttribute('src', `images/${String(idx+1).padStart(2,'0')}.jpg`);
-      img.setAttribute('width', 0.8); img.setAttribute('height', 0.8);
+      img.setAttribute('width', 0.8);
+      img.setAttribute('height', 0.6);
       img.setAttribute('position', '0 0 0.01');
       container.appendChild(img);
     }
 
     function buildFallback(idx) {
-      // прості кольорові квадратики як резерв
       const container = document.getElementById(`target-${idx}`);
+      container.innerHTML = '';
+      
       for (let i = 0; i < 9; i++) {
         const box = document.createElement('a-box');
-        box.setAttribute('color', `hsl(${i*40},100%,60%)`);
-        box.setAttribute('width',0.2); box.setAttribute('height',0.2); box.setAttribute('depth',0.01);
-        box.setAttribute('position', `${(Math.random()-0.5)*0.8} ${(Math.random()-0.5)*0.8} 0.05`);
+        box.setAttribute('color', `hsl(${i*40}, 100%, 60%)`);
+        box.setAttribute('width', 0.2);
+        box.setAttribute('height', 0.2);
+        box.setAttribute('depth', 0.01);
+        box.setAttribute('position', `${(Math.random()-0.5)*1} ${(Math.random()-0.5)*1} 0.05`);
+        box.setAttribute('drag-puzzle-piece', '');
+        box.setAttribute('data-tx', ((i % 3) - 1) * 0.25);
+        box.setAttribute('data-ty', (1 - Math.floor(i / 3)) * 0.25);
         container.appendChild(box);
       }
     }
 
-    // === ЗАПУСК ===
+    // === ЗАПУСК КАМЕРИ ===
+    async function startAR() {
+      try {
+        // Спочатку отримуємо доступ до камери
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          } 
+        });
+        
+        // Потім запускаємо MindAR
+        const scene = document.querySelector('a-scene');
+        const mindarSystem = scene.systems['mindar-image-system'];
+        await mindarSystem.start();
+        
+        // Показуємо інтерфейс
+        document.getElementById('startButton').style.display = 'none';
+        document.getElementById('hint').style.display = 'block';
+        document.getElementById('counter').style.display = 'block';
+        document.getElementById('loading').style.display = 'none';
+        
+      } catch (err) {
+        console.error('Помилка камери:', err);
+        alert('Дозволь доступ до камери для гри! 📱\n\nПотім перезавантаж сторінку.');
+      }
+    }
+
+    // === ІНІЦІАЛІЗАЦІЯ ===
     document.querySelector('a-scene').addEventListener('loaded', () => {
       document.getElementById('loading').style.display = 'none';
 
+      // Додаємо обробники подій для маркерів
       for (let i = 0; i < 12; i++) {
-        const t = document.getElementById(`target-${i}`);
-        t.addEventListener('targetFound', () => { activeTarget = i; createPuzzle(i); });
-        t.addEventListener('targetLost', () => { if (activeTarget === i) activeTarget = null; });
+        const target = document.getElementById(`target-${i}`);
+        target.addEventListener('targetFound', (e) => { 
+          window.activeTarget = i; 
+          createPuzzle(i);
+        });
+        target.addEventListener('targetLost', (e) => { 
+          if (window.activeTarget === i) window.activeTarget = null; 
+        });
       }
 
-      // Автозапуск камери + MindAR
-      document.body.addEventListener('click', () => {
-        const scene = document.querySelector('a-scene');
-        scene.systems['mindar-image-system'].start();
-        document.getElementById('hint').textContent = 'Перетягуй шматочки пальцем!';
-      }, {once: true});
+      // Запуск по кнопці
+      document.getElementById('startButton').addEventListener('click', startAR);
     });
   </script>
 </body>
