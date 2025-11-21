@@ -19,7 +19,7 @@
       touch-action: none;
     }
     
-    /* КАНВАС ПАЗЛУ */
+    /* КАНВАС ПАЗЛУ - ПРОЗОРИЙ */
     #puzzleCanvas {
       position: fixed;
       top: 0;
@@ -29,6 +29,7 @@
       z-index: 100;
       display: none;
       cursor: grab;
+      background: transparent !important; /* ✅ ПРОЗОРИЙ ФОН */
     }
     
     #puzzleCanvas:active {
@@ -125,7 +126,7 @@
       display: none;
     }
     
-    /* Приховуємо AR сцену */
+    /* AR сцена прозора */
     a-scene {
       position: fixed;
       top: 0;
@@ -138,7 +139,7 @@
   </style>
 </head>
 <body>
-  <!-- КАНВАС ДЛЯ ПАЗЛУ -->
+  <!-- КАНВАС ДЛЯ ПАЗЛУ З ПРОЗОРИМ ФОНОМ -->
   <canvas id="puzzleCanvas"></canvas>
   <button id="closePuzzle">✕</button>
   
@@ -195,6 +196,9 @@
     function initCanvas() {
       canvas = document.getElementById('puzzleCanvas');
       ctx = canvas.getContext('2d');
+      
+      // ✅ Встановлюємо прозорий фон для canvas
+      canvas.style.background = 'transparent';
       
       // Встановлюємо розміри canvas
       function resizeCanvas() {
@@ -303,13 +307,14 @@
     function drawPuzzle() {
       if (!currentPuzzle) return;
       
+      // ✅ ОЧИЩАЄМО КАНВАС ПОВНІСТЮ ПРОЗОРИМ - без чорного фону!
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Малюємо фон
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // ✅ ВИДАЛЕНО: Чорний напівпрозорий фон
+      // ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      // ctx.fillRect(0, 0, canvas.width, canvas.height);
       
-      // Малюємо контур зібраного пазлу
+      // Малюємо контур зібраного пазлу (прозорий)
       const puzzleWidth = currentPuzzle.pieces[0].width * 3;
       const puzzleHeight = currentPuzzle.pieces[0].height * 3;
       const centerX = (canvas.width - puzzleWidth) / 2;
@@ -333,7 +338,7 @@
         }
       });
       
-      // Інструкція
+      // Інструкція (на прозорому фоні)
       ctx.fillStyle = 'white';
       ctx.font = '24px Comic Sans MS';
       ctx.textAlign = 'center';
