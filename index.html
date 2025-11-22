@@ -2,16 +2,19 @@
 <html lang="uk">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Магічний пазл для зірочки</title>
 
-  <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
+  <!-- Найстабільніша комбо 2025 року -->
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 
   <style>
     *,*::before,*::after{box-sizing:border-box}
-    body,html{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:'Comic Sans MS',cursive,sans-serif;touch-action:none}
+    body,html{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;font-family:'Comic Sans MS',cursive,sans-serif;touch-action:none;-webkit-tap-highlight-color:transparent}
     canvas{position:fixed;inset:0;z-index:100;display:none;background:transparent}
     #closeBtn{position:fixed;top:15px;right:15px;width:60px;height:60px;font-size:32px;z-index:101;background:#ff1493;color:white;border:none;border-radius:50%;box-shadow:0 0 30px #ff1493;display:none;cursor:pointer}
     .screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:white;z-index:999;background:rgba(0,0,0,0.75);text-align:center;backdrop-filter:blur(8px)}
@@ -20,6 +23,7 @@
     #winScreen h1{animation:h 1.5s infinite}@keyframes h{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
     button{background:#ff1493;color:white;border:none;padding:20px 50px;border-radius:50px;font-size:32px;cursor:pointer;box-shadow:0 0 50px #ff1493;margin:15px;transition:.3s}
     button:hover{transform:scale(1.08);box-shadow:0 0 70px #ff69b4}
+    button:active{transform:scale(0.95)}
     #preview{width:160px;height:160px;border:6px solid gold;border-radius:25px;box-shadow:0 0 40px gold;margin:25px}
   </style>
 </head>
@@ -46,16 +50,17 @@
   </div>
 
   <a-scene embedded
-    mindar-image="imageTargetSrc: ./calendar.mind; uiLoading:no; uiScanning:no; uiError:no; filterMinCF:0.0001; filterBeta:0.001"
-    renderer="colorManagement:true; antialias:true"
+    mindar-image="imageTargetSrc: ./calendar.mind; filterMinCF:0.0001; filterBeta:0.001; warmupTolerance:3; autoStart:false;"
+    renderer="colorManagement:true; physicallyCorrectLights:true; antialias:true"
     vr-mode-ui="enabled:false"
     device-orientation-permission-ui="enabled:false"
+    loading-screen="enabled:false"
     style="position:fixed;inset:0;background:transparent">
     <a-camera active="false"></a-camera>
   </a-scene>
 
   <script>
-    const PUZZLES = Array.from({length:12},(_,i)=>({id:i,image:`images/${String(i+1).padStart(2,'0')}.jpg`,rows:3,cols:3}));
+    const PUZZLES = Array.from({length:12},(_,i)=>({id:i,image:`images/${String(i+1).padStart(2,'0')}.jpg`}));
 
     let currentPuzzle = null;
     let started = false;
@@ -65,12 +70,16 @@
         document.querySelectorAll('.screen').forEach(s=>s.style.display='none');
         document.getElementById('puzzleCanvas').style.display='none';
         document.getElementById('closeBtn').style.display='none';
-        if(name==='puzzle'){document.getElementById('puzzleCanvas').style.display='block';document.getElementById('closeBtn').style.display='block';}
-        else document.getElementById(name+'Screen').style.display='flex';
+        if(name==='puzzle'){
+          document.getElementById('puzzleCanvas').style.display='block';
+          document.getElementById('closeBtn').style.display='block';
+        } else {
+          document.getElementById(name+'Screen').style.display='flex';
+        }
       }
     };
 
-    function loadImage(src){return new Promise((res,rej)=>{const i=new Image();i.crossOrigin="anonymous";i.onload(()=>res(i));i.onerror=rej;i.src=src})}
+    function loadImage(src){return new Promise((res,rej)=>{const i=new Image();i.crossOrigin="anonymous";i.onload=()=>res(i);i.onerror=rej;i.src=src})}
 
     class PuzzleRenderer{
       constructor(c){this.c=c;this.ctx=c.getContext('2d',{alpha:true});this.resize();addEventListener('resize',()=>this.resize())}
@@ -81,7 +90,8 @@
         const w=p[0].width,h=p[0].height;
         const pw=w*3,ph=h*3,cx=(this.c.width-pw)/2,cy=(this.c.height-ph)/2;
         this.ctx.strokeStyle='gold';this.ctx.lineWidth=6;this.ctx.strokeRect(cx-12,cy-12,pw+24,ph+24);
-        p.forEach(piece=>{this.ctx.drawImage(piece.image,piece.x,piece.y,w,h);
+        p.forEach(piece=>{
+          this.ctx.drawImage(piece.image,piece.x,piece.y,w,h);
           if(piece===dragged){this.ctx.strokeStyle='#ff1493';this.ctx.lineWidth=5;this.ctx.strokeRect(piece.x,piece.y,w,h)}
         });
         this.ctx.fillStyle='rgba(255,255,255,0.92)';this.ctx.font='bold 28px "Comic Sans MS"';this.ctx.textAlign='center';
@@ -116,7 +126,7 @@
         const s=130;
         for(let i=0;i<9;i++){
           const cv=document.createElement('canvas');cv.width=cv.height=s;const ctx=cv.getContext('2d');
-          ctx.fillStyle=cols[i];ctx.fillRect(0,0,s,s);
+          ctx. fillStyle=cols[i];ctx.fillRect(0,0,s,s);
           ctx.fillStyle='white';ctx.font='bold 48px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
           ctx.fillText(i+1,s/2,s/2);
           const img=new Image();img.src=cv.toDataURL();
@@ -154,31 +164,46 @@
       }
     }
 
-    // === MindAR ===
-    const scene = document.querySelector('a-scene');
-    scene.addEventListener('loaded',()=>scene.components['mindar-image-system'].start());
-
-    PUZZLES.forEach(cfg=>{
-      const ent = document.createElement('a-entity');
-      ent.setAttribute('mindar-image-target',`targetIndex:${cfg.id}`);
-      ent.addEventListener('targetFound',()=>{
-        document.getElementById('preview').src=`images/${String(cfg.id+1).padStart(2,'0')}.jpg`;
-        if(currentPuzzle)return;
-        currentPuzzle = new PuzzleEngine(cfg,new PuzzleRenderer(document.getElementById('puzzleCanvas')));
-        screens.show('puzzle');
-      });
-      ent.addEventListener('targetLost',()=>{if(currentPuzzle){currentPuzzle=null;screens.show('hint')}});
-      scene.appendChild(ent);
-    });
-
-    document.getElementById('startBtn').onclick=async()=>{
-      if(started)return;started=true;
-      try{await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    // === MindAR старт (як у Monster Party) ===
+    document.getElementById('startBtn').onclick = async () => {
+      if(started) return; started = true;
+      try {
+        await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment", width:{ideal:1280}, height:{ideal:720}}});
+        const scene = document.querySelector('a-scene');
+        const mindarSystem = scene.systems['mindar-image-system'];
+        if(mindarSystem) mindarSystem.start();
         screens.show('hint');
-      }catch{alert("Дозволь доступ до камери!");started=false}
+      } catch(e) {
+        alert("Дозволь доступ до камери!");
+        started = false;
+      }
     };
 
-    document.getElementById('closeBtn').onclick=()=>{if(currentPuzzle){currentPuzzle=null;screens.show('hint')}};
+    document.getElementById('closeBtn').onclick = () => {
+      if(currentPuzzle){currentPuzzle=null;screens.show('hint')}
+    };
+
+    // === Реєстрація 12 маркерів ===
+    const sceneEl = document.querySelector('a-scene');
+    sceneEl.addEventListener('loaded', () => {
+      PUZZLES.forEach(cfg => {
+        const ent = document.createElement('a-entity');
+        ent.setAttribute('mindar-image-target', `targetIndex:${cfg.id}`);
+
+        ent.addEventListener('targetFound', () => {
+          document.getElementById('preview').src = cfg.image;
+          if(currentPuzzle) return;
+          currentPuzzle = new PuzzleEngine(cfg, new PuzzleRenderer(document.getElementById('puzzleCanvas')));
+          screens.show('puzzle');
+        });
+
+        ent.addEventListener('targetLost', () => {
+          if(currentPuzzle){currentPuzzle=null;screens.show('hint')}
+        });
+
+        sceneEl.appendChild(ent);
+      });
+    });
 
     screens.show('start');
   </script>
