@@ -15,7 +15,7 @@
     canvas:active{cursor:grabbing}
     .screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:white;z-index:999;text-align:center}
     #startScreen{background:radial-gradient(circle at center,#ff1493,#000)}
-    #hintScreen{background:rgba(0,0,0,0.95);font-size:28px}
+    #hintScreen{background:rgba(0,0,0,0.9);font-size:28px}
     #winScreen{background:rgba(0,0,0,0.95);color:gold;font-size:60px;display:none}
     #winScreen span{animation:bounce 1s infinite;margin-bottom:20px}
     @keyframes bounce{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
@@ -25,11 +25,9 @@
 </head>
 <body>
 
-  <!-- ПАЗЛ -->
   <canvas id="puzzleCanvas"></canvas>
   <button id="closeBtn">X</button>
 
-  <!-- ЕКРАНИ -->
   <div id="startScreen" class="screen">
     <button id="startBtn">ПОЧАТИ МАГІЮ!</button>
   </div>
@@ -43,24 +41,17 @@
     <div style="font-size:40px">Ти чарівний майстер пазлів!</div>
   </div>
 
-  <!-- AR СЦЕНА — ВСЕ ПРАЦЮЄ! -->
   <a-scene
     embedded
-    mindar-image="imageTargetSrc: calendar.mind; uiLoading: no; uiScanning: no; uiError: no;"
+    mindar-image="imageTargetSrc: calendar.mind; uiLoading: no; uiScanning: no;"
     renderer="colorManagement:true; antialias:true"
     vr-mode-ui="enabled:false"
-    device-orientation-permission-ui="enabled:false"
-    background="color: #000">
-
-    <!-- Камера активна! -->
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
+    device-orientation-permission-ui="enabled:false">
+    
+    <a-camera></a-camera>
   </a-scene>
 
   <script type="module">
-    // ================================================
-    // КОНФІГУРАЦІЯ — 12 пазлів
-    // ================================================
     const PUZZLES = Array.from({length:12}, (_,i) => ({
       id: i,
       image: `images/${String(i+1).padStart(2,'0')}.jpg`,
@@ -70,9 +61,6 @@
 
     let currentEngine = null;
 
-    // ================================================
-    // ЕКРАНИ
-    // ================================================
     const screens = {
       canvas: document.getElementById('puzzleCanvas'),
       closeBtn: document.getElementById('closeBtn'),
@@ -91,18 +79,12 @@
       }
     };
 
-    // ================================================
-    // КОНФЕТІ
-    // ================================================
     const celebrate = () => {
       confetti({particleCount:200,spread:100,origin:{y:0.6}});
       setTimeout(()=>confetti({particleCount:150,angle:60,spread:80,origin:{x:0}}),500);
       setTimeout(()=>confetti({particleCount:150,angle:120,spread:80,origin:{x:1}}),1000);
     };
 
-    // ================================================
-    // ЗАВАНТАЖЕННЯ ЗОБРАЖЕННЯ
-    // ================================================
     const loadImage = src => new Promise((res, rej) => {
       const img = new Image();
       img.onload = () => res(img);
@@ -110,9 +92,6 @@
       img.src = src;
     });
 
-    // ================================================
-    // РЕНДЕРЕР ПАЗЛУ
-    // ================================================
     class PuzzleRenderer {
       constructor(canvas) {
         this.canvas = canvas;
@@ -128,19 +107,14 @@
       draw(pieces, dragged = null) {
         this.clear();
         if (!pieces.length) return;
-
         const p = pieces[0];
         const pw = p.width * p.cols;
         const ph = p.height * p.rows;
         const cx = (this.canvas.width - pw) / 2;
         const cy = (this.canvas.height - ph) / 2;
-
-        // Рамка
         this.ctx.strokeStyle = 'gold';
         this.ctx.lineWidth = 6;
         this.ctx.strokeRect(cx-10, cy-10, pw+20, ph+20);
-
-        // Шматочки
         pieces.forEach(piece => {
           this.ctx.drawImage(piece.img, piece.x, piece.y, piece.width, piece.height);
           if (piece === dragged) {
@@ -149,8 +123,6 @@
             this.ctx.strokeRect(piece.x, piece.y, piece.width, piece.height);
           }
         });
-
-        // Підказка
         this.ctx.fillStyle = 'white';
         this.ctx.font = 'bold 28px Comic Sans MS';
         this.ctx.textAlign = 'center';
@@ -158,9 +130,6 @@
       }
     }
 
-    // ================================================
-    // ЛОГІКА ПАЗЛУ — 100% БЕЗ БАГІВ
-    // ================================================
     class PuzzleEngine {
       constructor(config) {
         this.config = config;
@@ -170,7 +139,6 @@
         this.offset = {x:0,y:0};
         this.init();
       }
-
       async init() {
         try {
           const img = await loadImage(this.config.image);
@@ -181,14 +149,12 @@
         this.bindEvents();
         this.renderer.draw(this.pieces);
       }
-
       createPieces(img) {
         const {rows, cols} = this.config;
         const pieceW = Math.min(180, innerWidth / 4);
         const pieceH = (img.height / img.width) * pieceW;
         const startX = (innerWidth - pieceW * cols) / 2;
         const startY = (innerHeight - pieceH * rows) / 2;
-
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
             const canvas = document.createElement('canvas');
@@ -196,10 +162,8 @@
             canvas.height = img.height / rows;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, c*canvas.width, r*canvas.height, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
-
             const pieceImg = new Image();
             pieceImg.src = canvas.toDataURL();
-
             this.pieces.push({
               img: pieceImg,
               x: Math.random() * (innerWidth - pieceW),
@@ -214,7 +178,6 @@
         }
         this.shuffle();
       }
-
       createFallbackPieces() {
         const colors = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8','#F7DC6F','#BB8FCE'];
         const size = 120;
@@ -228,10 +191,8 @@
           ctx.font = 'bold 50px Comic Sans MS';
           ctx.textAlign = 'center';
           ctx.fillText(i+1, size/2, size/2 + 18);
-
           const img = new Image();
           img.src = canvas.toDataURL();
-
           const row = Math.floor(i/3), col = i%3;
           this.pieces.push({
             img,
@@ -245,24 +206,20 @@
           });
         }
       }
-
       shuffle() {
         for (let i = this.pieces.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [this.pieces[i], this.pieces[j]] = [this.pieces[j], this.pieces[i]];
         }
       }
-
       bindEvents() {
         const canvas = this.renderer.canvas;
-
         const getPos = e => {
           const rect = canvas.getBoundingClientRect();
           const x = (e.clientX || e.touches?.[0]?.clientX || 0) - rect.left;
           const y = (e.clientY || e.touches?.[0]?.clientY || 0) - rect.top;
           return {x, y};
         };
-
         const start = e => {
           const {x, y} = getPos(e);
           for (let i = this.pieces.length - 1; i >= 0; i--) {
@@ -276,7 +233,6 @@
             }
           }
         };
-
         const move = e => {
           if (!this.dragged) return;
           e.preventDefault();
@@ -285,10 +241,8 @@
           this.dragged.y = y - this.offset.y;
           this.renderer.draw(this.pieces, this.dragged);
         };
-
         const end = () => {
           if (!this.dragged) return;
-
           const dx = this.dragged.x + this.dragged.width/2 - (this.dragged.targetX + this.dragged.width/2);
           const dy = this.dragged.y + this.dragged.height/2 - (this.dragged.targetY + this.dragged.height/2);
           if (Math.hypot(dx, dy) < 50) {
@@ -296,7 +250,6 @@
             this.dragged.y = this.dragged.targetY;
             this.dragged.placed = true;
           }
-
           if (this.pieces.every(p => p.placed)) {
             celebrate();
             setTimeout(() => screens.show('win'), 2000);
@@ -307,10 +260,8 @@
           } else {
             this.renderer.draw(this.pieces);
           }
-
           this.dragged = null;
         };
-
         canvas.addEventListener('mousedown', start);
         canvas.addEventListener('touchstart', start, {passive:false});
         canvas.addEventListener('mousemove', move);
@@ -320,45 +271,32 @@
       }
     }
 
-    // ================================================
-    // ЗАПУСК MINDAR — 100% РОБОЧИЙ!
-    // ================================================
-    const sceneEl = document.querySelector('a-scene');
-
+    // === ЗАПУСК — ПРОСТИЙ І НАДІЙНИЙ ===
     document.getElementById('startBtn').onclick = async () => {
-      if (window.mindarStarted) return;
-      window.mindarStarted = true;
-
       screens.show('hint');
 
-      // Чекаємо A-Frame
+      const sceneEl = document.querySelector('a-scene');
+      
+      // Чекаємо завантаження сцени
       if (!sceneEl.hasLoaded) {
         await new Promise(r => sceneEl.addEventListener('loaded', r, {once: true}));
       }
 
-      try {
-        // Запускаємо MindAR
-        await sceneEl.systems['mindar-image-system'].start();
-        console.log('Камера запущена!');
+      // Запускаємо MindAR (камеру)
+      await sceneEl.systems['mindar-image-system'].start();
 
-        // Додаємо 12 маркерів
-        PUZZLES.forEach(conf => {
-          const entity = document.createElement('a-entity');
-          entity.setAttribute('mindar-image-target', `targetIndex: ${conf.id}`);
-          entity.addEventListener('targetFound', () => {
-            if (!currentEngine) {
-              currentEngine = new PuzzleEngine(conf);
-              screens.show('puzzle');
-            }
-          });
-          sceneEl.appendChild(entity);
+      // Додаємо 12 маркерів
+      PUZZLES.forEach(conf => {
+        const entity = document.createElement('a-entity');
+        entity.setAttribute('mindar-image-target', `targetIndex: ${conf.id}`);
+        entity.addEventListener('targetFound', () => {
+          if (!currentEngine) {
+            currentEngine = new PuzzleEngine(conf);
+            screens.show('puzzle');
+          }
         });
-
-      } catch (err) {
-        alert('Не вдалося увімкнути камеру. Дозвольте доступ у налаштуваннях.');
-        console.error(err);
-        window.mindarStarted = false;
-      }
+        sceneEl.appendChild(entity);
+      });
     };
 
     document.getElementById('closeBtn').onclick = () => {
@@ -366,7 +304,6 @@
       screens.show('hint');
     };
 
-    // Початковий екран
     screens.show('start');
   </script>
 </body>
