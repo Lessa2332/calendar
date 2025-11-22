@@ -26,6 +26,7 @@
       z-index: 100;
       display: none;
       background: transparent;
+      pointer-events: auto; /* ✅ */
     }
     #closeBtn {
       position: fixed;
@@ -41,6 +42,7 @@
       z-index: 101;
       display: none;
       cursor: pointer;
+      pointer-events: auto; /* ✅ */
     }
     #winScreen {
       position: fixed;
@@ -55,9 +57,29 @@
       flex-direction: column;
       backdrop-filter: blur(10px);
     }
+
+    /* ✅ Привітання для дитини */
+    #hint {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 14px;
+      font-family: 'Comic Sans MS', cursive;
+      font-size: 22px;
+      text-align: center;
+      z-index: 999;
+      backdrop-filter: blur(8px);
+    }
   </style>
 </head>
 <body>
+
+  <!-- ✅ Привітання -->
+  <div id="hint">✨ Наведи камеру на картинку!<br>І побачиш чарівний пазл!</div>
 
   <canvas id="puzzleCanvas"></canvas>
   <button id="closeBtn">✕</button>
@@ -80,7 +102,6 @@
       image: `images/${String(i + 1).padStart(2, '0')}.jpg`
     }));
 
-    // ✅ 2. localStorage — зберігаємо прогрес
     let completed = new Set();
     if (localStorage.getItem('completed')) {
       try {
@@ -151,10 +172,21 @@
       async init() {
         try {
           const img = new Image();
-          img.src = this.config.image;
-          await img.decode();
+          // ✅ Надійне завантаження (проти помилок на Xiaomi/Huawei)
+          await new Promise((resolve, reject) => {
+            img.onload = () => {
+              if (!img.complete || img.naturalWidth === 0) {
+                reject(new Error("Image incomplete"));
+              } else {
+                resolve();
+              }
+            };
+            img.onerror = reject;
+            img.src = this.config.image;
+          });
           this.createPieces(img);
-        } catch {
+        } catch (e) {
+          console.warn("Помилка завантаження зображення:", this.config.image, e);
           this.createFallback();
         }
         this.bindEvents();
@@ -210,10 +242,8 @@
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(i + 1, s / 2, s / 2);
-          const img = new Image();
-          img.src = canvas.toDataURL();
           this.pieces.push({
-            image: img,
+            image: canvas, // ✅ використовуємо canvas напряму (без toDataURL)
             x: cx + Math.random() * (window.innerWidth - s * 2),
             y: cy + Math.random() * (window.innerHeight - s * 2),
             tx: cx + (i % 3) * s,
@@ -288,6 +318,7 @@
             currentPuzzle = null;
             document.getElementById('puzzleCanvas').style.display = 'none';
             document.getElementById('closeBtn').style.display = 'none';
+            document.getElementById('hint').style.display = 'block'; // ✅ повернути підказку
           }, 3000);
         }
       }
@@ -298,38 +329,43 @@
       }
     }
 
-    // ✅ ГОЛОВНЕ: ЗАПУСК ТІЛЬКИ ПІСЛЯ ДОДАВАННЯ СЛУХАЧІВ
     const scene = document.querySelector('a-scene');
     scene.addEventListener('loaded', () => {
-      // Спочатку додаємо всі маркери
       PUZZLES.forEach(cfg => {
         const ent = document.createElement('a-entity');
         ent.setAttribute('mindar-image-target', `targetIndex: ${cfg.id}`);
+
         ent.addEventListener('targetFound', () => {
           if (!currentPuzzle && !completed.has(cfg.id)) {
+            document.getElementById('hint').style.display = 'none'; // ✅ ховаємо підказку
             currentPuzzle = new PuzzleEngine(cfg, new PuzzleRenderer(document.getElementById('puzzleCanvas')));
             document.getElementById('puzzleCanvas').style.display = 'block';
             document.getElementById('closeBtn').style.display = 'block';
           }
         });
+
+        // ✅ Виправлення: очищення при втраті маркера
+        ent.addEventListener('targetLost', () => {
+          if (currentPuzzle && !completed.has(cfg.id)) {
+            currentPuzzle.destroy();
+            currentPuzzle = null;
+            document.getElementById('puzzleCanvas').style.display = 'none';
+            document.getElementById('closeBtn').style.display = 'none';
+            document.getElementById('hint').style.display = 'block';
+          }
+        });
+
         scene.appendChild(ent);
       });
 
-      // ✅ Лише тепер запускаємо AR
       (async () => {
         try {
           await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
           scene.systems['mindar-image-system'].start();
         } catch (e) {
           document.body.innerHTML = `
-            <div style="
-              position: fixed; inset: 0;
-              display: flex; align-items: center; justify-content: center;
-              background: #000; color: white; font-family: Arial, sans-serif;
-              text-align: center; padding: 20px; font-size: 24px; line-height: 1.5;
-            ">
-              Камера не працює 😢<br>
-              Онови сторінку і дозволь доступ до камери!
+            <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;color:white;font-family:Arial;text-align:center;padding:20px;font-size:24px;line-height:1.5;">
+              Камера не працює 😢<br>Онови сторінку і дозволь доступ до камери!
             </div>
           `;
         }
@@ -343,6 +379,7 @@
       }
       document.getElementById('puzzleCanvas').style.display = 'none';
       document.getElementById('closeBtn').style.display = 'none';
+      document.getElementById('hint').style.display = 'block'; // ✅
     };
   </script>
 </body>
