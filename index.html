@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Магічний пазл для зірочки</title>
 
-  <!-- Найкраща комбінація 2025 року -->
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@2.2.1/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
@@ -17,8 +16,6 @@
       font-family:'Comic Sans MS', cursive, sans-serif;
       touch-action: none;
     }
-
-    /* Гарантія видимості камери */
     a-scene canvas, video { background:transparent !important; }
     .mindar-ui-overlay { background:transparent !important; }
 
@@ -29,13 +26,11 @@
       z-index:999; box-shadow:0 0 40px rgba(255,20,147,0.8); text-align:center;
       border:3px solid white; animation:pulse 2s infinite;
     }
-
     #loading {
       position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
       background:rgba(0,0,0,0.9); color:#fff; padding:20px 40px; border-radius:20px;
       font-size:24px; z-index:1001; display:none;
     }
-
     #win {
       position:fixed; inset:0; background:rgba(0,0,0,0.97); color:gold;
       display:none; flex-direction:column; align-items:center; justify-content:center;
@@ -43,7 +38,6 @@
     }
     #win span { font-size:clamp(50px,12vw,100px); animation:bounce 1s infinite; }
     #win p { font-size:clamp(24px,6vw,40px); color:#ff69b4; margin-top:20px; }
-
     @keyframes pulse { 0%,100% {opacity:1} 50% {opacity:0.7} }
     @keyframes bounce { 0%,100% {transform:scale(1)} 50% {transform:scale(1.2)} }
   </style>
@@ -58,9 +52,10 @@
     <p>Ти найкращий чарівник!</p>
   </div>
 
+  <!-- КЛЮЧ: повний HTTPS URL до .mind файлу -->
   <a-scene
     embedded
-    mindar-image="imageTargetSrc: calendar.mind; uiLoading: no; uiError: no; uiScanning: no; autoStart: false; filterMinCF: 0.0001; filterBeta: 1000;"
+    mindar-image="imageTargetSrc: https://raw.githubusercontent.com/essa2332/calendar/main/calendar.mind; uiLoading: no; uiError: no; uiScanning: no; autoStart: false; filterMinCF: 0.0001; filterBeta: 1000;"
     renderer="colorManagement: true; alpha: true;"
     vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false">
@@ -96,19 +91,17 @@
           }
         }
 
-        // Гарантія видимості камери
         setupVideoFix() {
           const observer = new MutationObserver(() => {
             const video = document.querySelector('video');
             if (video) {
-              video.style.cssText = 'position:fixed !important; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1;';
+              video.style.cssText = 'position:fixed !important; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1; background:transparent !important;';
               observer.disconnect();
             }
           });
           observer.observe(document.body, { childList: true, subtree: true });
         }
 
-        // КРИТИЧНИЙ ФІКС: правильний запуск після кліку
         setupStartClick() {
           document.body.addEventListener('click', async () => {
             document.getElementById('hint').textContent = 'Запускаємо камеру...';
@@ -123,8 +116,8 @@
               document.getElementById('hint').textContent = 'Знайди маркер у календарі!';
               this.setupTracking();
             } catch (err) {
-              console.error(err);
-              document.getElementById('hint').textContent = 'Помилка камери! Дозволь доступ!';
+              console.error('MindAR start error:', err);
+              document.getElementById('hint').textContent = 'Помилка! Дозволь камеру';
             } finally {
               document.getElementById('loading').style.display = 'none';
             }
@@ -153,7 +146,9 @@
           const num = String(index + 1).padStart(2, '0');
           const img = new Image();
           img.crossOrigin = "anonymous";
-          img.src = `images/${num}.jpg?t=${Date.now()}`;
+
+          // КЛЮЧ: HTTPS + raw URL
+          img.src = `https://raw.githubusercontent.com/essa2332/calendar/main/images/${num}.jpg?t=${Date.now()}`;
 
           img.onload = () => {
             const pieces = this.generatePieces(img);
@@ -163,7 +158,7 @@
           };
 
           img.onerror = () => {
-            document.getElementById('hint').textContent = 'Не вдалося завантажити зображення';
+            document.getElementById('hint').textContent = 'Зображення не знайдено';
             document.getElementById('loading').style.display = 'none';
           };
         }
@@ -224,7 +219,9 @@
         }
 
         setupClickHandler(pieces) {
-          if (this.clickHandler) document.querySelector('a-scene').removeEventListener('click', this.clickHandler);
+          if (this.clickHandler) {
+            document.querySelector('a-scene').removeEventListener('click', this.clickHandler);
+          }
 
           this.clickHandler = (e) => {
             const el = e.detail?.intersectedEl;
@@ -265,7 +262,6 @@
         victory() {
           document.getElementById('win').style.display = 'flex';
           document.getElementById('hint').textContent = 'Вітаю! Знайди наступний маркер!';
-
           document.getElementById('yay').play().catch(() => {});
 
           if (typeof confetti === 'function') {
@@ -290,7 +286,6 @@
         }
       }
 
-      // Запуск гри
       new MagicPuzzleGame();
     });
   </script>
