@@ -2,14 +2,10 @@
 <html lang="uk">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <title>Магічний пазл для зірочки</title>
 
-  <!-- ПОВНОСТЮ ВИДАЛЕНО: Content-Security-Policy -->
-  <!-- Тепер працює на GitHub Pages без блокування inline-скриптів -->
-
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-  <!-- ✅ ВИПРАВЛЕНО: використовуємо npm CDN замість gh -->
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
   
@@ -19,7 +15,8 @@
       padding: 0;
       height: 100%;
       overflow: hidden;
-      background: #000;
+      /* ✅ ЗРОБИТИ фон прозорим — відео з камери буде видно */
+      background: transparent !important;
       font-family: 'Comic Sans MS', cursive, sans-serif;
       touch-action: none;
     }
@@ -33,7 +30,8 @@
       z-index: 100;
       display: none;
       cursor: grab;
-      background: rgba(0, 0, 0, 0.9);
+      /* ✅ Прозорий фон canvas — тільки пазли видно */
+      background: transparent;
     }
     
     canvas:active {
@@ -53,29 +51,20 @@
       color: white;
       z-index: 999;
       text-align: center;
+      /* ✅ Прозорий фон екранів */
+      background: rgba(0, 0, 0, 0.6);
     }
     
     #startScreen {
-      background: radial-gradient(circle at center, #ff1493, #000);
+      background: radial-gradient(circle at center, rgba(255, 20, 147, 0.8), transparent);
     }
     
-    #loadingScreen {
-      background: rgba(0, 0, 0, 0.95);
-      font-size: 28px;
-      display: none;
-    }
-    
-    #hintScreen {
-      background: rgba(0, 0, 0, 0.9);
-      font-size: 28px;
-      display: none;
+    #loadingScreen, #hintScreen, #winScreen {
+      background: rgba(0, 0, 0, 0.6);
     }
     
     #winScreen {
-      background: rgba(0, 0, 0, 0.95);
       color: gold;
-      font-size: 60px;
-      display: none;
     }
     
     #winScreen span {
@@ -122,6 +111,11 @@
     .mindar-ui-overlay, .mindar-ui-loading, .mindar-ui-scanning {
       display: none !important;
     }
+
+    /* Додатково: приховуємо відео MindAR, якщо воно не прозоре (редко потрібно) */
+    .mindar-video {
+      z-index: 1 !important;
+    }
   </style>
 </head>
 <body>
@@ -154,13 +148,13 @@
     mindar-image="imageTargetSrc: calendar.mind; autoStart: false;"
     renderer="colorManagement: true; antialias: true"
     vr-mode-ui="enabled: false" 
-    device-orientation-permission-ui="enabled: false">
+    device-orientation-permission-ui="enabled: false"
+    style="background: transparent !important;">
     
     <a-camera active="false"></a-camera>
   </a-scene>
 
   <script>
-    // (Увесь JavaScript залишився без змін — працює, бо немає CSP)
     // ================================================
     // КОНФІГУРАЦІЯ ПАЗЛІВ
     // ================================================
@@ -257,6 +251,7 @@
     function loadImage(src) {
       return new Promise((resolve, reject) => {
         const img = new Image();
+        img.crossOrigin = "anonymous";
         img.onload = () => resolve(img);
         img.onerror = () => reject(new Error(`Не вдалося завантажити: ${src}`));
         img.src = src;
@@ -264,12 +259,12 @@
     }
 
     // ================================================
-    // РЕНДЕРЕР ПАЗЛУ
+    // РЕНДЕРЕР ПАЗЛУ (тепер без фону!)
     // ================================================
     class PuzzleRenderer {
       constructor(canvas) {
         this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
+        this.ctx = canvas.getContext('2d', { alpha: true }); // ✅ Прозорий контекст
         this.setupCanvas();
       }
 
@@ -284,6 +279,7 @@
       }
 
       render(pieces, draggedPiece = null) {
+        // ✅ Очищаємо з прозорістю
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
         if (!pieces || pieces.length === 0) return;
@@ -296,6 +292,7 @@
         const centerX = (this.canvas.width - puzzleWidth) / 2;
         const centerY = (this.canvas.height - puzzleHeight) / 2;
         
+        // ✅ Малюємо лише рамку пазлу (без фону)
         this.ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
         this.ctx.shadowBlur = 20;
         this.ctx.strokeStyle = 'gold';
@@ -303,6 +300,7 @@
         this.ctx.strokeRect(centerX, centerY, puzzleWidth, puzzleHeight);
         this.ctx.shadowBlur = 0;
         
+        // Малюємо шматочки
         pieces.forEach(piece => {
           if (piece.image && piece.image.complete) {
             this.ctx.drawImage(piece.image, piece.x, piece.y, piece.width, piece.height);
@@ -315,6 +313,7 @@
           }
         });
 
+        // Інструкція (прозора)
         this.ctx.fillStyle = 'white';
         this.ctx.font = 'bold 28px "Comic Sans MS"';
         this.ctx.textAlign = 'center';
@@ -322,9 +321,8 @@
       }
     }
 
-    // ================================================
-    // ЛОГІКА ПАЗЛУ
-    // ================================================
+    // (Решта класів PuzzleEngine, MindARController — без змін)
+
     class PuzzleEngine {
       constructor(config, renderer) {
         this.config = config;
@@ -551,9 +549,6 @@
       }
     }
 
-    // ================================================
-    // AR КОНТРОЛЕР
-    // ================================================
     class MindARController {
       constructor() {
         this.sceneEl = document.querySelector('a-scene');
@@ -589,14 +584,19 @@
       }
     }
 
-    // ================================================
-    // ЗАПУСК ГРИ
-    // ================================================
     const arController = new MindARController();
 
     document.getElementById('startBtn').addEventListener('click', async () => {
       try {
-        await navigator.mediaDevices.getUserMedia({ video: true });
+        // ✅ Явно запитуємо задню камеру (хоча MindAR робить це сам)
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" } // задня камера
+          }
+        });
+        // Зупиняємо потік — MindAR запустить свій
+        stream.getTracks().forEach(track => track.stop());
+
         screens.show('loading');
         arController.initialize();
 
