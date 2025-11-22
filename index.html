@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
-  <!-- ФІКС CSP: додаємо 'unsafe-eval' і розширюємо для A-Frame/MindAR -->
+  <!-- CSP залишаємо як є — він не блокує камеру -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://aframe.io https://cdn.jsdelivr.net https://raw.githubusercontent.com; style-src 'self' 'unsafe-inline'; img-src * data: blob: https:; media-src *; connect-src *;">
   <title>Магічний пазл для зірочки</title>
 
@@ -18,7 +18,6 @@
       font-family:'Comic Sans MS', cursive, sans-serif;
       touch-action: none;
     }
-    /* ФІКС CORB: гарантія прозорості */
     a-scene canvas, video { background:transparent !important; z-index:-1; object-fit:cover; }
     .mindar-ui-overlay { background:transparent !important; }
 
@@ -55,7 +54,6 @@
     <p>Ти найкращий чарівник!</p>
   </div>
 
-  <!-- ФІКС CORB: повний HTTPS URL для .mind -->
   <a-scene
     embedded
     mindar-image="imageTargetSrc: https://raw.githubusercontent.com/essa2332/calendar/main/calendar.mind; uiLoading: no; uiError: no; uiScanning: no; autoStart: false; filterMinCF: 0.0001; filterBeta: 1000;"
@@ -111,16 +109,24 @@
             document.getElementById('loading').style.display = 'block';
 
             try {
+              // 🔑 КРИТИЧНИЙ ФІКС: запит камери всередині обробника кліку
+              const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' } // використовуємо задню камеру
+              });
+              // Зберігаємо потік, щоб браузер не закрив доступ
+              window._tempCameraStream = stream;
+
               const scene = document.querySelector('a-scene');
               const mindar = scene.systems['mindar-image-system'];
               if (mindar && !mindar.initialized) {
                 await mindar.start();
               }
+
               document.getElementById('hint').textContent = 'Знайди маркер у календарі!';
               this.setupTracking();
             } catch (err) {
-              console.error('MindAR start error:', err);
-              document.getElementById('hint').textContent = 'Помилка! Дозволь камеру';
+              console.error('Camera or MindAR error:', err);
+              document.getElementById('hint').textContent = 'Дозволь доступ до камери у налаштуваннях!';
             } finally {
               document.getElementById('loading').style.display = 'none';
             }
@@ -149,8 +155,6 @@
           const num = String(index + 1).padStart(2, '0');
           const img = new Image();
           img.crossOrigin = "anonymous";
-
-          // ФІКС CORB: повний HTTPS URL для зображень
           img.src = `https://raw.githubusercontent.com/essa2332/calendar/main/images/${num}.jpg?t=${Date.now()}`;
 
           img.onload = () => {
@@ -159,7 +163,6 @@
             document.getElementById('hint').textContent = 'Клацай шматочки — збирай пазл!';
             document.getElementById('loading').style.display = 'none';
 
-            // Автоматичний звук
             const audio = new Audio(`https://raw.githubusercontent.com/essa2332/calendar/main/fon/${num}.mp3`);
             audio.play().catch(() => {});
           };
