@@ -113,6 +113,34 @@
             display: none;
         }
 
+        /* КНОПКА МУЗИКИ */
+        #musicButton {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 20, 147, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 70px;
+            height: 70px;
+            font-size: 32px;
+            cursor: pointer;
+            z-index: 999;
+            box-shadow: 0 0 20px #ff1493;
+            transition: all 0.3s;
+        }
+
+        #musicButton:hover {
+            transform: scale(1.1);
+            background: #ff1493;
+        }
+
+        #musicButton.muted {
+            background: rgba(128, 128, 128, 0.8);
+            box-shadow: 0 0 20px #666;
+        }
+
         /* Приховуємо UI MindAR */
         .mindar-ui-overlay, .mindar-ui-loading, .mindar-ui-scanning {
             display: none !important;
@@ -131,6 +159,16 @@
         <div style="font-size: 40px;">Ти чарівний майстер пазлів! ✨</div>
     </div>
     <button id="startButton">🎮 ПОЧАТИ МАГІЮ! 🎮</button>
+    
+    <!-- КНОПКА МУЗИКИ -->
+    <button id="musicButton">🎵</button>
+
+    <!-- АУДІО ДЛЯ ФОНОВОЇ МУЗИКИ -->
+    <audio id="backgroundMusic" loop>
+        <source src="fon/background.mp3" type="audio/mpeg">
+        <source src="fon/background.ogg" type="audio/ogg">
+        <source src="fon/01.mp3" type="audio/mpeg">
+    </audio>
 
     <!-- AR СЦЕНА -->
     <a-scene
@@ -165,6 +203,86 @@
         let draggedPiece = null;
         let dragOffset = { x: 0, y: 0 };
         let isDragging = false;
+        let isMusicPlaying = false;
+
+        // === УПРАВЛІННЯ МУЗИКОЮ ===
+        function initMusic() {
+            const musicButton = document.getElementById('musicButton');
+            const backgroundMusic = document.getElementById('backgroundMusic');
+            
+            // Спробуємо знайти музику
+            const musicSources = [
+                'fon/background.mp3',
+                'fon/background.ogg', 
+                'fon/01.mp3',
+                'fon/02.mp3',
+                'fon/music.mp3',
+                'fon/audio.mp3'
+            ];
+            
+            // Автозапуск музики при натисканні кнопки старт
+            musicButton.addEventListener('click', function() {
+                if (isMusicPlaying) {
+                    // Вимикаємо музику
+                    backgroundMusic.pause();
+                    musicButton.textContent = '🔇';
+                    musicButton.classList.add('muted');
+                    isMusicPlaying = false;
+                } else {
+                    // Вмикаємо музику
+                    backgroundMusic.volume = 0.3; // Тихий рівень для фону
+                    
+                    // Спробуємо відтворити
+                    const playPromise = backgroundMusic.play();
+                    
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            musicButton.textContent = '🎵';
+                            musicButton.classList.remove('muted');
+                            isMusicPlaying = true;
+                        }).catch(error => {
+                            console.log('Автовідтворення заблоковано:', error);
+                            // Спробуємо інші джерела музики
+                            tryNextMusicSource(0);
+                        });
+                    }
+                }
+            });
+            
+            // Функція для спроби інших джерел музики
+            function tryNextMusicSource(index) {
+                if (index >= musicSources.length) {
+                    console.log('Не знайдено жодного музичного файлу');
+                    musicButton.textContent = '❌';
+                    return;
+                }
+                
+                backgroundMusic.src = musicSources[index];
+                backgroundMusic.load();
+                
+                const playPromise = backgroundMusic.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        musicButton.textContent = '🎵';
+                        musicButton.classList.remove('muted');
+                        isMusicPlaying = true;
+                        console.log('Музика знайдена:', musicSources[index]);
+                    }).catch(() => {
+                        // Спробуємо наступний файл
+                        tryNextMusicSource(index + 1);
+                    });
+                }
+            }
+            
+            // Автоматично запускаємо музику при старті гри
+            document.getElementById('startButton').addEventListener('click', function() {
+                if (!isMusicPlaying) {
+                    setTimeout(() => {
+                        musicButton.click(); // Симулюємо клік для запуску музики
+                    }, 1000);
+                }
+            });
+        }
 
         // === КАНВАС ПАЗЛУ ===
         function initCanvas() {
@@ -265,11 +383,33 @@
                 draggedPiece.y = targetY;
                 draggedPiece.isInPlace = true;
                 
+                // Відтворюємо веселий звук при правильному розміщенні
+                playSuccessSound();
                 checkIfSolved();
             }
             
             draggedPiece = null;
             drawPuzzle();
+        }
+
+        function playSuccessSound() {
+            // Створюємо простий веселий звук
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // Нота C
+            oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // Нота E
+            oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // Нота G
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
         }
 
         function drawPuzzle() {
@@ -529,6 +669,7 @@
         // === ІНІЦІАЛІЗАЦІЯ ===
         document.querySelector('a-scene').addEventListener('loaded', function() {
             initCanvas();
+            initMusic(); // Ініціалізуємо музику
             
             // Додаємо обробники для всіх маркерів
             for (let i = 0; i < 12; i++) {
