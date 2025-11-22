@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Магічний пазл для зірочки</title>
+  
+  <!-- ✅ ДОДАНО FAVICON -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>🎮</text></svg>">
+  
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
@@ -156,12 +160,11 @@
   <div id="loading">Завантажуємо магію...</div>
   <button id="startButton">🎮 ПОЧАТИ ГРУ 🎮</button>
 
-  <!-- AR СЦЕНА З ВІДЕО ФОНОМ -->
+  <!-- ✅ ВИПРАВЛЕНО: Додано закриваючу лапку для mindar-image -->
   <a-scene
     embedded
-    mindar-image="imageTargetSrc: calendar.mind; filterMinCF:0.0001; filterBeta:0.01; autoStart: false; showBackground: true;" 
-    <!-- ✅ ДОДАНО: showBackground: true -->
-    renderer="colorManagement: true; antialias: true"
+    mindar-image="imageTargetSrc: calendar.mind; filterMinCF:0.0001; filterBeta:0.01; autoStart: false; showBackground: true;"
+    renderer="colorManagement: true; antialias: true; useLegacyLights: false" <!-- ✅ ДОДАНО: useLegacyLights: false -->
     vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false">
 
@@ -340,6 +343,7 @@
     async function createPuzzle(index) {
       if (puzzleStates[index]?.solved) return;
       
+      // ✅ ВИПРАВЛЕНО: Використовуємо правильний шлях до зображень
       const url = `images/${String(index+1).padStart(2,'0')}.jpg?t=${Date.now()}`;
       
       try {
@@ -360,10 +364,13 @@
         
         try {
           const audio = document.getElementById('yay');
-          audio.src = `fon/${String(index+1).padStart(2,'0')}.mp3`;
+          // ✅ ВИПРАВЛЕНО: Використовуємо правильний шлях до аудіо
+          audio.src = `sounds/${String(index+1).padStart(2,'0')}.mp3`;
           audio.volume = 0.7;
-          audio.play().catch(e => console.log('🔇 Звук не відтворився'));
-        } catch(e) {}
+          audio.play().catch(e => console.log('🔇 Звук не відтворився:', e));
+        } catch(e) {
+          console.log('🔇 Помилка завантаження звуку:', e);
+        }
         
       } catch (error) {
         console.error('Помилка завантаження пазлу:', error);
@@ -373,10 +380,19 @@
 
     function loadImage(url) {
       return new Promise((resolve, reject) => {
+        // ✅ ДОДАНО: Перевірка кешу
+        if (imageCache[url]) {
+          resolve(imageCache[url]);
+          return;
+        }
+        
         const img = new Image();
         img.crossOrigin = "anonymous";
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error(`Не вдалося завантажити зображення`));
+        img.onload = () => {
+          imageCache[url] = img;
+          resolve(img);
+        };
+        img.onerror = () => reject(new Error(`Не вдалося завантажити зображення: ${url}`));
         img.src = url;
       });
     }
@@ -432,6 +448,7 @@
           }
         }
         
+        // Перемішуємо шматочки
         for (let i = pieces.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
@@ -534,15 +551,26 @@
     // === ЗАПУСК КАМЕРИ ===
     async function startAR() {
       try {
-        // ✅ Спочатку отримуємо доступ до камери
+        // ✅ ВИПРАВЛЕНО: Краща обробка помилок камери
         const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' } 
+          video: { 
+            facingMode: 'environment',
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          } 
         });
         
-        // ✅ Потім запускаємо MindAR
+        // ✅ ДОДАНО: Запускаємо AR після успішного отримання потоку
         const scene = document.querySelector('a-scene');
-        const mindarSystem = scene.systems['mindar-image-system'];
-        await mindarSystem.start();
+        if (scene.hasLoaded) {
+          const mindarSystem = scene.systems['mindar-image-system'];
+          await mindarSystem.start();
+        } else {
+          scene.addEventListener('loaded', async () => {
+            const mindarSystem = scene.systems['mindar-image-system'];
+            await mindarSystem.start();
+          });
+        }
         
         document.getElementById('startButton').style.display = 'none';
         document.getElementById('hint').style.display = 'block';
@@ -551,28 +579,40 @@
         
       } catch (err) {
         console.error('Помилка камери:', err);
-        alert('Дозволь доступ до камери для гри! 📱');
+        alert('Дозволь доступ до камери для гри! 📱\nПомилка: ' + err.message);
       }
     }
 
     // === ІНІЦІАЛІЗАЦІЯ ===
-    document.querySelector('a-scene').addEventListener('loaded', () => {
-      document.getElementById('loading').style.display = 'none';
-      initCanvas();
-
-      for (let i = 0; i < 12; i++) {
-        const target = document.getElementById(`target-${i}`);
-        target.addEventListener('targetFound', () => { 
-          if (!currentPuzzle) {
-            activeTarget = i;
-            createPuzzle(i);
-          }
-        });
-      }
-
-      document.getElementById('startButton').addEventListener('click', startAR);
+    document.addEventListener('DOMContentLoaded', function() {
+      const scene = document.querySelector('a-scene');
       
-      document.getElementById('closePuzzle').addEventListener('click', closePuzzle);
+      scene.addEventListener('loaded', () => {
+        console.log('✅ A-Frame сцена завантажена');
+        document.getElementById('loading').style.display = 'none';
+        initCanvas();
+
+        // Додаємо обробники подій для маркерів
+        for (let i = 0; i < 12; i++) {
+          const target = document.getElementById(`target-${i}`);
+          if (target) {
+            target.addEventListener('targetFound', () => { 
+              if (!currentPuzzle) {
+                activeTarget = i;
+                createPuzzle(i);
+              }
+            });
+          }
+        }
+
+        document.getElementById('startButton').addEventListener('click', startAR);
+        document.getElementById('closePuzzle').addEventListener('click', closePuzzle);
+      });
+
+      // ✅ ДОДАНО: Резервний запуск, якщо сцена вже завантажена
+      if (scene.hasLoaded) {
+        scene.dispatchEvent(new Event('loaded'));
+      }
     });
   </script>
 </body>
