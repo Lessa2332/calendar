@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://aframe.io https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://assets.mixkit.co; media-src 'self' https://assets.mixkit.co;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://aframe.io https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://assets.mixkit.co; media-src 'self' https://assets.mixkit.co; connect-src 'self' https://aframe.io https://cdn.jsdelivr.net https://assets.mixkit.co;">
   <title>Магічний пазл для зірочки</title>
   
   <!-- A-Frame 1.7.0 + MindAR 2.2.1 -->
@@ -146,386 +146,442 @@
 <audio id="yay" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3" preload="auto"></audio>
 
 <script>
-class MagicPuzzleGame {
-  constructor() {
-    this.currentPuzzle = null;
-    this.activeTargetIndex = null;
-    this.clickHandler = null;
-    this.resizeTimeout = null;
-    this.isInitialized = false;
-    
-    this.init();
-  }
-
-  init() {
-    this.createTargets();
-    this.setupEventListeners();
-    this.setupVideoObserver();
-  }
-
-  createTargets() {
-    const container = document.getElementById('targets-container');
-    for (let i = 0; i < 12; i++) {
-      const target = document.createElement('a-entity');
-      target.setAttribute('mindar-image-target', `targetIndex: ${i}`);
-      target.id = `target-${i}`;
-      container.appendChild(target);
-    }
-  }
-
-  setupEventListeners() {
-    const scene = document.querySelector('a-scene');
-    
-    scene.addEventListener('targetFound', (event) => this.onTargetFound(event));
-    scene.addEventListener('targetLost', (event) => this.onTargetLost(event));
-    
-    window.addEventListener('resize', () => this.handleResize());
-    
-    // Запуск AR при першому кліку
-    document.body.addEventListener('click', () => this.startAR(), { once: true });
-  }
-
-  setupVideoObserver() {
-    const observer = new MutationObserver((mutations) => {
-      const video = document.querySelector('video');
-      if (video) {
-        this.setupVideoStyles(video);
-        observer.disconnect();
-      }
-    });
-    
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
-
-  setupVideoStyles(video) {
-    video.style.position = 'fixed';
-    video.style.zIndex = '-1';
-    video.style.objectFit = 'cover';
-    video.style.width = '100%';
-    video.style.height = '100%';
-  }
-
-  async startAR() {
-    this.showLoading('Запускаємо камеру...');
-    
-    try {
-      const scene = document.querySelector('a-scene');
-      const mindarComponent = scene.systems['mindar-image-system'];
-      
-      if (mindarComponent && !mindarComponent.initialized) {
-        await mindarComponent.start();
-        document.getElementById('hint').textContent = 'Знайди маркер у календарі! 📖';
-      }
-    } catch (error) {
-      console.error('AR start failed:', error);
-      document.getElementById('hint').textContent = '❌ Помилка камери! Дозволь доступ до камери.';
-    } finally {
-      this.hideLoading();
-    }
-  }
-
-  onTargetFound(event) {
-    const targetIndex = event.detail.targetIndex;
-    if (this.activeTargetIndex === targetIndex) return;
-
-    this.resetPuzzle();
-    this.activeTargetIndex = targetIndex;
-    
-    setTimeout(() => {
-      this.createPuzzle(targetIndex);
-    }, 500);
-  }
-
-  onTargetLost(event) {
-    const targetIndex = event.detail.targetIndex;
-    if (this.activeTargetIndex === targetIndex) {
-      this.resetPuzzle();
-    }
-  }
-
-  resetPuzzle() {
-    if (this.clickHandler) {
-      document.querySelector('a-scene').removeEventListener('click', this.clickHandler);
+// Виносимо весь JavaScript в окремий файл або залишаємо inline з правильними дозволами
+document.addEventListener('DOMContentLoaded', function() {
+  'use strict';
+  
+  class MagicPuzzleGame {
+    constructor() {
+      this.currentPuzzle = null;
+      this.activeTargetIndex = null;
       this.clickHandler = null;
+      this.resizeTimeout = null;
+      this.isInitialized = false;
+      
+      this.init();
     }
 
-    for (let i = 0; i < 12; i++) {
-      const target = document.getElementById(`target-${i}`);
-      if (target) target.innerHTML = '';
+    init() {
+      this.createTargets();
+      this.setupEventListeners();
+      this.setupVideoObserver();
     }
 
-    this.activeTargetIndex = null;
-    this.currentPuzzle = null;
-    document.getElementById('win').style.display = 'none';
-  }
+    createTargets() {
+      const container = document.getElementById('targets-container');
+      if (!container) return;
+      
+      for (let i = 0; i < 12; i++) {
+        const target = document.createElement('a-entity');
+        target.setAttribute('mindar-image-target', 'targetIndex: ' + i);
+        target.id = 'target-' + i;
+        container.appendChild(target);
+      }
+    }
 
-  async createPuzzle(targetIndex) {
-    this.showLoading('Створюємо пазл...');
+    setupEventListeners() {
+      const scene = document.querySelector('a-scene');
+      if (!scene) return;
+      
+      scene.addEventListener('targetFound', (event) => this.onTargetFound(event));
+      scene.addEventListener('targetLost', (event) => this.onTargetLost(event));
+      
+      window.addEventListener('resize', () => this.handleResize());
+      
+      // Запуск AR при першому кліку
+      document.body.addEventListener('click', () => this.startAR(), { once: true });
+    }
 
-    try {
-      const puzzleData = await this.createAdaptivePuzzle(targetIndex);
-      if (!puzzleData) {
-        throw new Error('Не вдалося завантажити пазл');
+    setupVideoObserver() {
+      const observer = new MutationObserver((mutations) => {
+        const video = document.querySelector('video');
+        if (video) {
+          this.setupVideoStyles(video);
+          observer.disconnect();
+        }
+      });
+      
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    setupVideoStyles(video) {
+      video.style.position = 'fixed';
+      video.style.zIndex = '-1';
+      video.style.objectFit = 'cover';
+      video.style.width = '100%';
+      video.style.height = '100%';
+    }
+
+    async startAR() {
+      this.showLoading('Запускаємо камеру...');
+      
+      try {
+        const scene = document.querySelector('a-scene');
+        const mindarComponent = scene?.systems['mindar-image-system'];
+        
+        if (mindarComponent && !mindarComponent.initialized) {
+          await mindarComponent.start();
+          this.updateHint('Знайди маркер у календарі! 📖');
+        }
+      } catch (error) {
+        console.error('AR start failed:', error);
+        this.updateHint('❌ Помилка камери! Дозволь доступ до камери.');
+      } finally {
+        this.hideLoading();
+      }
+    }
+
+    onTargetFound(event) {
+      const targetIndex = event.detail.targetIndex;
+      if (this.activeTargetIndex === targetIndex) return;
+
+      this.resetPuzzle();
+      this.activeTargetIndex = targetIndex;
+      
+      setTimeout(() => {
+        this.createPuzzle(targetIndex);
+      }, 500);
+    }
+
+    onTargetLost(event) {
+      const targetIndex = event.detail.targetIndex;
+      if (this.activeTargetIndex === targetIndex) {
+        this.resetPuzzle();
+      }
+    }
+
+    resetPuzzle() {
+      if (this.clickHandler) {
+        const scene = document.querySelector('a-scene');
+        if (scene) {
+          scene.removeEventListener('click', this.clickHandler);
+        }
+        this.clickHandler = null;
       }
 
-      this.currentPuzzle = puzzleData;
-      this.setupPuzzleElements(targetIndex, puzzleData.pieces);
-      this.setupClickHandler(puzzleData.pieces);
-      
-      document.getElementById('hint').textContent = 'Клацай на шматочки, щоб зібрати пазл! 🧩';
+      for (let i = 0; i < 12; i++) {
+        const target = document.getElementById('target-' + i);
+        if (target) target.innerHTML = '';
+      }
 
-    } catch (error) {
-      console.error('Puzzle creation failed:', error);
-      document.getElementById('hint').textContent = '❌ Помилка завантаження пазлу';
-    } finally {
-      this.hideLoading();
+      this.activeTargetIndex = null;
+      this.currentPuzzle = null;
+      this.hideWinScreen();
     }
-  }
 
-  createAdaptivePuzzle(targetIndex) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = `./images/${String(targetIndex + 1).padStart(2, '0')}.jpg?t=${Date.now()}`;
-      
-      img.onload = () => {
-        const rows = 3, cols = 3;
-        
-        // Адаптивні розміри
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-        const isPortrait = screenHeight > screenWidth;
-        
-        const baseSize = Math.min(screenWidth, screenHeight);
-        const pieceSize = Math.max(80, Math.min(180, baseSize / (isPortrait ? 3.5 : 4.5)));
-        
-        const scale = Math.min(screenWidth / 1080, screenHeight / 1920, 1.3);
-        const finalSize = pieceSize * scale;
+    async createPuzzle(targetIndex) {
+      this.showLoading('Створюємо пазл...');
 
-        const puzzleWidth = finalSize * cols;
-        const puzzleHeight = finalSize * rows;
-
-        // Безпечна область з урахуванням інтерфейсу
-        const safeArea = {
-          top: Math.max((screenHeight - puzzleHeight) * 0.4, 80),
-          left: Math.max((screenWidth - puzzleWidth) * 0.5, 20)
-        };
-
-        const pieces = [];
-        const pieceW = img.width / cols;
-        const pieceH = img.height / rows;
-
-        for (let row = 0; row < rows; row++) {
-          for (let col = 0; col < cols; col++) {
-            const canvas = this.createPieceCanvas(img, col * pieceW, row * pieceH, pieceW, pieceH);
-            
-            const targetX = safeArea.left + col * finalSize;
-            const targetY = safeArea.top + row * finalSize;
-
-            // Випадкові позиції з урахуванням меж екрану
-            const randomX = this.getRandomPosition(20, screenWidth - finalSize - 20);
-            const randomY = this.getRandomPosition(120, screenHeight - finalSize - 120);
-
-            pieces.push({
-              canvas: canvas,
-              size: finalSize,
-              x: randomX,
-              y: randomY,
-              targetX: targetX,
-              targetY: targetY,
-              isInPlace: false,
-              row: row,
-              col: col
-            });
-          }
+      try {
+        const puzzleData = await this.createAdaptivePuzzle(targetIndex);
+        if (!puzzleData) {
+          throw new Error('Не вдалося завантажити пазл');
         }
 
-        // Перемішування
-        this.shuffleArray(pieces);
+        this.currentPuzzle = puzzleData;
+        this.setupPuzzleElements(targetIndex, puzzleData.pieces);
+        this.setupClickHandler(puzzleData.pieces);
+        
+        this.updateHint('Клацай на шматочки, щоб зібрати пазл! 🧩');
 
-        resolve({
-          pieces: pieces,
-          index: targetIndex,
-          safeArea: safeArea
+      } catch (error) {
+        console.error('Puzzle creation failed:', error);
+        this.updateHint('❌ Помилка завантаження пазлу');
+      } finally {
+        this.hideLoading();
+      }
+    }
+
+    createAdaptivePuzzle(targetIndex) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        
+        // Форматуємо номер з ведучими нулями
+        const imageNumber = String(targetIndex + 1).padStart(2, '0');
+        img.src = './images/' + imageNumber + '.jpg?t=' + Date.now();
+        
+        img.onload = () => {
+          const rows = 3, cols = 3;
+          
+          // Адаптивні розміри
+          const screenWidth = window.innerWidth;
+          const screenHeight = window.innerHeight;
+          const isPortrait = screenHeight > screenWidth;
+          
+          const baseSize = Math.min(screenWidth, screenHeight);
+          const pieceSize = Math.max(80, Math.min(180, baseSize / (isPortrait ? 3.5 : 4.5)));
+          
+          const scale = Math.min(screenWidth / 1080, screenHeight / 1920, 1.3);
+          const finalSize = pieceSize * scale;
+
+          const puzzleWidth = finalSize * cols;
+          const puzzleHeight = finalSize * rows;
+
+          // Безпечна область з урахуванням інтерфейсу
+          const safeArea = {
+            top: Math.max((screenHeight - puzzleHeight) * 0.4, 80),
+            left: Math.max((screenWidth - puzzleWidth) * 0.5, 20)
+          };
+
+          const pieces = [];
+          const pieceW = img.width / cols;
+          const pieceH = img.height / rows;
+
+          for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+              const canvas = this.createPieceCanvas(img, col * pieceW, row * pieceH, pieceW, pieceH);
+              
+              const targetX = safeArea.left + col * finalSize;
+              const targetY = safeArea.top + row * finalSize;
+
+              // Випадкові позиції з урахуванням меж екрану
+              const randomX = this.getRandomPosition(20, screenWidth - finalSize - 20);
+              const randomY = this.getRandomPosition(120, screenHeight - finalSize - 120);
+
+              pieces.push({
+                canvas: canvas,
+                size: finalSize,
+                x: randomX,
+                y: randomY,
+                targetX: targetX,
+                targetY: targetY,
+                isInPlace: false,
+                row: row,
+                col: col
+              });
+            }
+          }
+
+          // Перемішування
+          this.shuffleArray(pieces);
+
+          resolve({
+            pieces: pieces,
+            index: targetIndex,
+            safeArea: safeArea
+          });
+        };
+        
+        img.onerror = () => {
+          console.error('Помилка завантаження зображення:', targetIndex);
+          resolve(null);
+        };
+      });
+    }
+
+    createPieceCanvas(img, sx, sy, sw, sh) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Оптимізація розміру для продуктивності
+      const maxSize = 400;
+      const scale = Math.min(1, maxSize / Math.max(sw, sh));
+      
+      canvas.width = sw * scale;
+      canvas.height = sh * scale;
+      
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      return canvas;
+    }
+
+    getRandomPosition(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+      }
+      return array;
+    }
+
+    setupPuzzleElements(targetIndex, pieces) {
+      const targetContainer = document.getElementById('target-' + targetIndex);
+      if (!targetContainer) return;
+      
+      targetContainer.innerHTML = '';
+
+      pieces.forEach((piece, index) => {
+        const plane = document.createElement('a-plane');
+        const sizeInMeters = piece.size / 100;
+        
+        plane.setAttribute('src', piece.canvas.toDataURL('image/jpeg', 0.9));
+        plane.setAttribute('width', sizeInMeters.toString());
+        plane.setAttribute('height', sizeInMeters.toString());
+        plane.setAttribute('position', this.getWebPosition(piece.x, piece.y));
+        plane.setAttribute('data-target-pos', this.getWebPosition(piece.targetX, piece.targetY));
+        plane.setAttribute('data-index', index.toString());
+        plane.setAttribute('class', 'puzzle-piece');
+        plane.setAttribute('material', 'transparent: true; alphaTest: 0.5;');
+        
+        targetContainer.appendChild(plane);
+        piece.el = plane;
+      });
+    }
+
+    getWebPosition(x, y) {
+      const webX = (x - window.innerWidth / 2) / 100;
+      const webY = (window.innerHeight / 2 - y) / 100;
+      return webX + ' ' + webY + ' 0.02';
+    }
+
+    setupClickHandler(pieces) {
+      this.clickHandler = (event) => {
+        const pieceEl = event.detail?.intersectedEl;
+        if (!pieceEl || !pieceEl.classList.contains('puzzle-piece') || !this.currentPuzzle) {
+          return;
+        }
+
+        const pieceIndex = parseInt(pieceEl.getAttribute('data-index') || '0');
+        this.handlePieceClick(pieceIndex, pieces);
+      };
+
+      const scene = document.querySelector('a-scene');
+      if (scene) {
+        scene.addEventListener('click', this.clickHandler);
+      }
+    }
+
+    handlePieceClick(clickedIndex, pieces) {
+      const clickedPiece = pieces[clickedIndex];
+      if (!clickedPiece || clickedPiece.isInPlace) return;
+
+      // Знайти інший рухомий шматок
+      const movablePieces = pieces.filter((p, idx) => 
+        p.el && !p.isInPlace && idx !== clickedIndex
+      );
+
+      if (movablePieces.length === 0) return;
+      
+      const otherPiece = movablePieces[Math.floor(Math.random() * movablePieces.length)];
+      const otherIndex = pieces.indexOf(otherPiece);
+
+      if (!pieces[otherIndex]?.el) return;
+
+      // Обмін позиціями
+      this.swapPieces(clickedPiece, pieces[otherIndex]);
+      
+      // Перевірка чи пазл зібрано
+      this.checkWinCondition(pieces);
+    }
+
+    swapPieces(pieceA, pieceB) {
+      const tempPos = pieceA.el.getAttribute('position');
+      pieceA.el.setAttribute('position', pieceB.el.getAttribute('position'));
+      pieceB.el.setAttribute('position', tempPos);
+
+      // Оновлення даних позицій
+      const tempX = pieceA.x;
+      const tempY = pieceA.y;
+      pieceA.x = pieceB.x;
+      pieceA.y = pieceB.y;
+      pieceB.x = tempX;
+      pieceB.y = tempY;
+    }
+
+    checkWinCondition(pieces) {
+      if (!pieces) return false;
+
+      const isSolved = pieces.every(piece => {
+        const dx = Math.abs(piece.x - piece.targetX);
+        const dy = Math.abs(piece.y - piece.targetY);
+        return dx < 20 && dy < 20; // Tolerance для полегшення перемоги
+      });
+
+      if (isSolved) {
+        this.handleWin();
+        return true;
+      }
+      return false;
+    }
+
+    handleWin() {
+      this.showWinScreen();
+      
+      // Відтворення звуку
+      const audio = document.getElementById('yay');
+      if (audio) {
+        audio.play().catch(e => console.log('Audio play prevented:', e));
+      }
+      
+      // Ефект конфетті
+      if (typeof confetti === 'function') {
+        confetti({ 
+          particleCount: 300,
+          spread: 100,
+          origin: { y: 0.6 },
+          colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
         });
-      };
-      
-      img.onerror = () => {
-        console.error('Помилка завантаження зображення:', targetIndex);
-        resolve(null);
-      };
-    });
-  }
-
-  createPieceCanvas(img, sx, sy, sw, sh) {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    // Оптимізація розміру для продуктивності
-    const maxSize = 400;
-    const scale = Math.min(1, maxSize / Math.max(sw, sh));
-    
-    canvas.width = sw * scale;
-    canvas.height = sh * scale;
-    
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-    return canvas;
-  }
-
-  getRandomPosition(min, max) {
-    return Math.random() * (max - min) + min;
-  }
-
-  shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-  }
-
-  setupPuzzleElements(targetIndex, pieces) {
-    const targetContainer = document.getElementById(`target-${targetIndex}`);
-    targetContainer.innerHTML = '';
-
-    pieces.forEach((piece, index) => {
-      const plane = document.createElement('a-plane');
-      const sizeInMeters = piece.size / 100;
-      
-      plane.setAttribute('src', piece.canvas.toDataURL('image/jpeg', 0.9));
-      plane.setAttribute('width', sizeInMeters);
-      plane.setAttribute('height', sizeInMeters);
-      plane.setAttribute('position', this.getWebPosition(piece.x, piece.y));
-      plane.setAttribute('data-target-pos', this.getWebPosition(piece.targetX, piece.targetY));
-      plane.setAttribute('data-index', index);
-      plane.setAttribute('class', 'puzzle-piece');
-      plane.setAttribute('material', 'transparent: true; alphaTest: 0.5;');
-      
-      targetContainer.appendChild(plane);
-      piece.el = plane;
-    });
-  }
-
-  getWebPosition(x, y) {
-    const webX = (x - window.innerWidth / 2) / 100;
-    const webY = (window.innerHeight / 2 - y) / 100;
-    return `${webX} ${webY} 0.02`;
-  }
-
-  setupClickHandler(pieces) {
-    this.clickHandler = (event) => {
-      const pieceEl = event.detail?.intersectedEl;
-      if (!pieceEl || !pieceEl.classList.contains('puzzle-piece') || !this.currentPuzzle) {
-        return;
+        
+        // Додаткові хвилі конфетті
+        setTimeout(() => confetti({ particleCount: 200, angle: 60, spread: 80, origin: { x: 0 } }), 300);
+        setTimeout(() => confetti({ particleCount: 200, angle: 120, spread: 80, origin: { x: 1 } }), 600);
       }
 
-      const pieceIndex = parseInt(pieceEl.getAttribute('data-index'));
-      this.handlePieceClick(pieceIndex, pieces);
-    };
+      this.updateHint('🎉 Вітаю! Знайди наступний маркер!');
 
-    document.querySelector('a-scene').addEventListener('click', this.clickHandler);
-  }
-
-  handlePieceClick(clickedIndex, pieces) {
-    const clickedPiece = pieces[clickedIndex];
-    if (!clickedPiece || clickedPiece.isInPlace) return;
-
-    // Знайти інший рухомий шматок
-    const movablePieces = pieces.filter((p, idx) => 
-      p.el && !p.isInPlace && idx !== clickedIndex
-    );
-
-    if (movablePieces.length === 0) return;
-    
-    const otherPiece = movablePieces[Math.floor(Math.random() * movablePieces.length)];
-    const otherIndex = pieces.indexOf(otherPiece);
-
-    if (!pieces[otherIndex]?.el) return;
-
-    // Обмін позиціями
-    this.swapPieces(clickedPiece, pieces[otherIndex]);
-    
-    // Перевірка чи пазл зібрано
-    this.checkWinCondition(pieces);
-  }
-
-  swapPieces(pieceA, pieceB) {
-    const tempPos = pieceA.el.getAttribute('position');
-    pieceA.el.setAttribute('position', pieceB.el.getAttribute('position'));
-    pieceB.el.setAttribute('position', tempPos);
-
-    // Оновлення даних позицій
-    [pieceA.x, pieceB.x] = [pieceB.x, pieceA.x];
-    [pieceA.y, pieceB.y] = [pieceB.y, pieceA.y];
-  }
-
-  checkWinCondition(pieces) {
-    if (!pieces) return false;
-
-    const isSolved = pieces.every(piece => {
-      const dx = Math.abs(piece.x - piece.targetX);
-      const dy = Math.abs(piece.y - piece.targetY);
-      return dx < 20 && dy < 20; // Tolerance для полегшення перемоги
-    });
-
-    if (isSolved) {
-      this.handleWin();
-      return true;
-    }
-    return false;
-  }
-
-  handleWin() {
-    document.getElementById('win').style.display = 'flex';
-    
-    // Відтворення звуку
-    const audio = document.getElementById('yay');
-    audio.play().catch(e => console.log('Audio play prevented:', e));
-    
-    // Ефект конфетті
-    confetti({ 
-      particleCount: 300,
-      spread: 100,
-      origin: { y: 0.6 },
-      colors: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']
-    });
-    
-    // Додаткові хвилі конфетті
-    setTimeout(() => confetti({ particleCount: 200, angle: 60, spread: 80, origin: { x: 0 } }), 300);
-    setTimeout(() => confetti({ particleCount: 200, angle: 120, spread: 80, origin: { x: 1 } }), 600);
-
-    document.getElementById('hint').textContent = '🎉 Вітаю! Знайди наступний маркер!';
-
-    if (this.clickHandler) {
-      document.querySelector('a-scene').removeEventListener('click', this.clickHandler);
-      this.clickHandler = null;
-    }
-  }
-
-  handleResize() {
-    if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
-    
-    this.resizeTimeout = setTimeout(() => {
-      if (this.currentPuzzle && this.activeTargetIndex !== null) {
-        this.resetPuzzle();
-        setTimeout(() => this.createPuzzle(this.activeTargetIndex), 400);
+      if (this.clickHandler) {
+        const scene = document.querySelector('a-scene');
+        if (scene) {
+          scene.removeEventListener('click', this.clickHandler);
+        }
+        this.clickHandler = null;
       }
-    }, 400);
+    }
+
+    handleResize() {
+      if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
+      
+      this.resizeTimeout = setTimeout(() => {
+        if (this.currentPuzzle && this.activeTargetIndex !== null) {
+          this.resetPuzzle();
+          setTimeout(() => this.createPuzzle(this.activeTargetIndex), 400);
+        }
+      }, 400);
+    }
+
+    showLoading(message) {
+      const loading = document.getElementById('loading');
+      if (loading) {
+        loading.textContent = message;
+        loading.style.display = 'block';
+      }
+    }
+
+    hideLoading() {
+      const loading = document.getElementById('loading');
+      if (loading) {
+        loading.style.display = 'none';
+      }
+    }
+
+    showWinScreen() {
+      const winScreen = document.getElementById('win');
+      if (winScreen) {
+        winScreen.style.display = 'flex';
+      }
+    }
+
+    hideWinScreen() {
+      const winScreen = document.getElementById('win');
+      if (winScreen) {
+        winScreen.style.display = 'none';
+      }
+    }
+
+    updateHint(message) {
+      const hint = document.getElementById('hint');
+      if (hint) {
+        hint.textContent = message;
+      }
+    }
   }
 
-  showLoading(message) {
-    const loading = document.getElementById('loading');
-    loading.textContent = message;
-    loading.style.display = 'block';
-  }
-
-  hideLoading() {
-    document.getElementById('loading').style.display = 'none';
-  }
-}
-
-// Ініціалізація гри при завантаженні сторінки
-document.addEventListener('DOMContentLoaded', () => {
+  // Ініціалізація гри
   new MagicPuzzleGame();
 });
 
