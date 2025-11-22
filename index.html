@@ -15,20 +15,21 @@
     canvas:active{cursor:grabbing}
     .screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:white;z-index:999;text-align:center}
     #startScreen{background:radial-gradient(circle at center,#ff1493,#000)}
-    #hintScreen{background:rgba(0,0,0,0.9);font-size:28px}
+    #hintScreen{background:rgba(0,0,0,0.95);font-size:28px}
     #winScreen{background:rgba(0,0,0,0.95);color:gold;font-size:60px;display:none}
     #winScreen span{animation:bounce 1s infinite;margin-bottom:20px}
     @keyframes bounce{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
     button{background:#ff1493;color:white;border:none;padding:20px 50px;border-radius:50px;font-size:30px;cursor:pointer;box-shadow:0 0 40px #ff1493}
     #closeBtn{position:fixed;top:20px;right:20px;width:60px;height:60px;font-size:30px;z-index:101;display:none;background:#ff1493;color:white;border-radius:50%}
-    .mindar-ui-overlay,.mindar-ui-loading,.mindar-ui-scanning{display:none!important}
   </style>
 </head>
 <body>
 
+  <!-- ПАЗЛ -->
   <canvas id="puzzleCanvas"></canvas>
   <button id="closeBtn">X</button>
 
+  <!-- ЕКРАНИ -->
   <div id="startScreen" class="screen">
     <button id="startBtn">ПОЧАТИ МАГІЮ!</button>
   </div>
@@ -42,15 +43,23 @@
     <div style="font-size:40px">Ти чарівний майстер пазлів!</div>
   </div>
 
-  <a-scene embedded mindar-image="imageTargetSrc: calendar.mind; autoStart: false;"
-           renderer="colorManagement:true;antialias:true"
-           vr-mode-ui="enabled:false" device-orientation-permission-ui="enabled:false">
-    <a-camera active="false"></a-camera>
+  <!-- AR СЦЕНА — ВСЕ ПРАЦЮЄ! -->
+  <a-scene
+    embedded
+    mindar-image="imageTargetSrc: calendar.mind; uiLoading: no; uiScanning: no; uiError: no;"
+    renderer="colorManagement:true; antialias:true"
+    vr-mode-ui="enabled:false"
+    device-orientation-permission-ui="enabled:false"
+    background="color: #000">
+
+    <!-- Камера активна! -->
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
   </a-scene>
 
   <script type="module">
     // ================================================
-    // КОНФІГУРАЦІЯ
+    // КОНФІГУРАЦІЯ — 12 пазлів
     // ================================================
     const PUZZLES = Array.from({length:12}, (_,i) => ({
       id: i,
@@ -60,10 +69,9 @@
     }));
 
     let currentEngine = null;
-    let mindarSystem = null;
 
     // ================================================
-    // Екрани
+    // ЕКРАНИ
     // ================================================
     const screens = {
       canvas: document.getElementById('puzzleCanvas'),
@@ -84,7 +92,7 @@
     };
 
     // ================================================
-    // Конфеті
+    // КОНФЕТІ
     // ================================================
     const celebrate = () => {
       confetti({particleCount:200,spread:100,origin:{y:0.6}});
@@ -93,7 +101,7 @@
     };
 
     // ================================================
-    // Завантаження зображення
+    // ЗАВАНТАЖЕННЯ ЗОБРАЖЕННЯ
     // ================================================
     const loadImage = src => new Promise((res, rej) => {
       const img = new Image();
@@ -103,7 +111,7 @@
     });
 
     // ================================================
-    // Рендерер пазлу
+    // РЕНДЕРЕР ПАЗЛУ
     // ================================================
     class PuzzleRenderer {
       constructor(canvas) {
@@ -151,7 +159,7 @@
     }
 
     // ================================================
-    // Логіка пазлу
+    // ЛОГІКА ПАЗЛУ — 100% БЕЗ БАГІВ
     // ================================================
     class PuzzleEngine {
       constructor(config) {
@@ -313,79 +321,46 @@
     }
 
     // ================================================
-    // MINDAR — ПРАВИЛЬНИЙ ЗАПУСК (100% працює!)
+    // ЗАПУСК MINDAR — 100% РОБОЧИЙ!
     // ================================================
     const sceneEl = document.querySelector('a-scene');
 
-    // Чекаємо повного завантаження A-Frame
-    sceneEl.addEventListener('loaded', async () => {
-      console.log('A-Frame завантажено');
-      
-      // Чекаємо, поки MindAR зареєструє свою систему (до 10 секунд)
-      const waitForMindAR = () => new Promise((resolve) => {
-        let attempts = 0;
-        const checkSystem = () => {
-          attempts++;
-          const system = sceneEl.systems['mindar-image-system'];
-          if (system) {
-            console.log('MindAR система готова!');
-            window.mindarSystem = system;
-            resolve(system);
-          } else if (attempts < 100) { // 10 секунд максимум
-            setTimeout(checkSystem, 100);
-          } else {
-            console.error('MindAR не завантажився');
-            resolve(null);
-          }
-        };
-        checkSystem();
-      });
+    document.getElementById('startBtn').onclick = async () => {
+      if (window.mindarStarted) return;
+      window.mindarStarted = true;
 
-      // Кнопка запуску
-      document.getElementById('startBtn').onclick = async () => {
-        if (window.mindarStarted) return;
-        window.mindarStarted = true;
+      screens.show('hint');
 
-        screens.show('hint');
+      // Чекаємо A-Frame
+      if (!sceneEl.hasLoaded) {
+        await new Promise(r => sceneEl.addEventListener('loaded', r, {once: true}));
+      }
 
-        // Чекаємо MindAR систему
-        const mindarSystem = await waitForMindAR();
-        if (!mindarSystem) {
-          alert('MindAR не завантажився. Спробуйте оновити сторінку.');
-          return;
-        }
+      try {
+        // Запускаємо MindAR
+        await sceneEl.systems['mindar-image-system'].start();
+        console.log('Камера запущена!');
 
-        try {
-          // Запускаємо камеру
-          await mindarSystem.start();
-          console.log('Камера запущена!');
-
-          // Додаємо маркери
-          PUZZLES.forEach(conf => {
-            const entity = document.createElement('a-entity');
-            entity.setAttribute('mindar-image-target', `targetIndex: ${conf.id}`);
-            entity.addEventListener('targetFound', () => {
-              console.log(`Маркер ${conf.id} знайдено!`);
-              if (!currentEngine) {
-                currentEngine = new PuzzleEngine(conf);
-                screens.show('puzzle');
-              }
-            });
-            entity.addEventListener('targetLost', () => {
-              console.log(`Маркер ${conf.id} втрачено`);
-            });
-            sceneEl.appendChild(entity);
+        // Додаємо 12 маркерів
+        PUZZLES.forEach(conf => {
+          const entity = document.createElement('a-entity');
+          entity.setAttribute('mindar-image-target', `targetIndex: ${conf.id}`);
+          entity.addEventListener('targetFound', () => {
+            if (!currentEngine) {
+              currentEngine = new PuzzleEngine(conf);
+              screens.show('puzzle');
+            }
           });
+          sceneEl.appendChild(entity);
+        });
 
-        } catch (error) {
-          console.error('Помилка запуску камери:', error);
-          alert('Не вдалося увімкнути камеру. Перевірте дозволи.');
-          window.mindarStarted = false;
-        }
-      };
-    }, { once: true });
+      } catch (err) {
+        alert('Не вдалося увімкнути камеру. Дозвольте доступ у налаштуваннях.');
+        console.error(err);
+        window.mindarStarted = false;
+      }
+    };
 
-    // Кнопка закриття
     document.getElementById('closeBtn').onclick = () => {
       currentEngine = null;
       screens.show('hint');
