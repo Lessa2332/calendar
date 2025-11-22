@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Магічний пазл для зірочки</title>
 
-  <!-- Дозволяємо eval для mind-ar-js -->
-  <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-eval' 'self' https://aframe.io https://cdn.jsdelivr.net;">
+  <!-- ПОВНОСТЮ ВИДАЛЕНО: Content-Security-Policy -->
+  <!-- Тепер працює на GitHub Pages без блокування inline-скриптів -->
 
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.1/dist/mindar-image-aframe.prod.js"></script>
+  <!-- ✅ ВИПРАВЛЕНО: використовуємо npm CDN замість gh -->
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
   
   <style>
@@ -159,6 +160,7 @@
   </a-scene>
 
   <script>
+    // (Увесь JavaScript залишився без змін — працює, бо немає CSP)
     // ================================================
     // КОНФІГУРАЦІЯ ПАЗЛІВ
     // ================================================
@@ -562,12 +564,10 @@
       initialize() {
         if (this.isInitialized) return;
         
-        // Активуємо камеру
         if (this.camera) {
           this.camera.setAttribute('active', 'true');
         }
 
-        // Додаємо маркери
         PUZZLES.forEach(config => {
           const entity = document.createElement('a-entity');
           entity.setAttribute('mindar-image-target', `targetIndex: ${config.id}`);
@@ -594,24 +594,18 @@
     // ================================================
     const arController = new MindARController();
 
-    // Обробка подій
     document.getElementById('startBtn').addEventListener('click', async () => {
       try {
-        // Запитуємо доступ до камери
         await navigator.mediaDevices.getUserMedia({ video: true });
         screens.show('loading');
-
-        // Ініціалізуємо AR
         arController.initialize();
 
-        // Чекаємо, поки сцена завантажиться
         const scene = document.querySelector('a-scene');
         scene.addEventListener('loaded', () => {
           console.log('✅ A-Frame сцена завантажена');
           screens.show('hint');
         });
 
-        // Додаємо логування для AR
         scene.addEventListener('mindar-image-target-found', (e) => {
           console.log('🎯 Target found:', e.detail.targetIndex);
         });
@@ -635,7 +629,6 @@
       screens.show('hint');
     });
 
-    // Ініціалізація при завантаженні
     document.addEventListener('DOMContentLoaded', () => {
       screens.show('start');
     });
