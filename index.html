@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Магічний пазл для зірочки</title>
+
+  <!-- Дозволяємо eval для mind-ar-js -->
+  <meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-eval' 'self' https://aframe.io https://cdn.jsdelivr.net;">
+
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.1/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
@@ -52,6 +56,12 @@
     
     #startScreen {
       background: radial-gradient(circle at center, #ff1493, #000);
+    }
+    
+    #loadingScreen {
+      background: rgba(0, 0, 0, 0.95);
+      font-size: 28px;
+      display: none;
     }
     
     #hintScreen {
@@ -122,6 +132,11 @@
     <button id="startBtn">🎮 ПОЧАТИ МАГІЮ! 🎮</button>
   </div>
 
+  <div id="loadingScreen" class="screen">
+    <div style="font-size: 32px; margin-bottom: 20px;">⏳ Завантаження AR...</div>
+    <div style="font-size: 24px; opacity: 0.8;">Будь ласка, зачекайте...</div>
+  </div>
+
   <div id="hintScreen" class="screen">
     <div style="font-size: 32px; margin-bottom: 20px;">🔍 Покажи маркер камері!</div>
     <div style="font-size: 24px; opacity: 0.8;">Знайди спеціальні картинки та збирай пазли!</div>
@@ -132,10 +147,10 @@
     <div style="font-size: 40px; margin-top: 20px;">Ти чарівний майстер пазлів! ✨</div>
   </div>
 
-  <!-- AR СЦЕНА З АВТОМАТИЧНИМ ЗАПУСКОМ -->
+  <!-- AR СЦЕНА -->
   <a-scene 
     embedded 
-    mindar-image="imageTargetSrc: calendar.mind; autoStart: true;"
+    mindar-image="imageTargetSrc: calendar.mind; autoStart: false;"
     renderer="colorManagement: true; antialias: true"
     vr-mode-ui="enabled: false" 
     device-orientation-permission-ui="enabled: false">
@@ -163,6 +178,7 @@
       constructor() {
         this.screens = {
           start: document.getElementById('startScreen'),
+          loading: document.getElementById('loadingScreen'),
           hint: document.getElementById('hintScreen'),
           win: document.getElementById('winScreen')
         };
@@ -171,17 +187,18 @@
       }
 
       show(screenName) {
-        // Ховаємо всі екрани
         Object.values(this.screens).forEach(screen => {
           if (screen) screen.style.display = 'none';
         });
         this.canvas.style.display = 'none';
         this.closeBtn.style.display = 'none';
 
-        // Показуємо потрібний екран
         switch(screenName) {
           case 'start':
             this.screens.start.style.display = 'flex';
+            break;
+          case 'loading':
+            this.screens.loading.style.display = 'flex';
             break;
           case 'hint':
             this.screens.hint.style.display = 'flex';
@@ -204,14 +221,12 @@
     // ================================================
     class ConfettiManager {
       celebrate() {
-        // Основна хмара
         confetti({
           particleCount: 200,
           spread: 100,
           origin: { y: 0.6 }
         });
 
-        // Ліва сторона
         setTimeout(() => {
           confetti({
             particleCount: 150,
@@ -221,7 +236,6 @@
           });
         }, 500);
 
-        // Права сторона
         setTimeout(() => {
           confetti({
             particleCount: 150,
@@ -268,21 +282,18 @@
       }
 
       render(pieces, draggedPiece = null) {
-        // Очищаємо canvas
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         
         if (!pieces || pieces.length === 0) return;
 
-        // Малюємо рамку пазлу
         const pieceWidth = pieces[0].width;
         const pieceHeight = pieces[0].height;
-        const cols = 3; // всі пазли 3x3
+        const cols = 3;
         const puzzleWidth = pieceWidth * cols;
         const puzzleHeight = pieceHeight * cols;
         const centerX = (this.canvas.width - puzzleWidth) / 2;
         const centerY = (this.canvas.height - puzzleHeight) / 2;
         
-        // Рамка з тінню
         this.ctx.shadowColor = 'rgba(255, 215, 0, 0.5)';
         this.ctx.shadowBlur = 20;
         this.ctx.strokeStyle = 'gold';
@@ -290,13 +301,11 @@
         this.ctx.strokeRect(centerX, centerY, puzzleWidth, puzzleHeight);
         this.ctx.shadowBlur = 0;
         
-        // Малюємо шматочки
         pieces.forEach(piece => {
           if (piece.image && piece.image.complete) {
             this.ctx.drawImage(piece.image, piece.x, piece.y, piece.width, piece.height);
           }
           
-          // Підсвічуємо перетягуваний шматочок
           if (piece === draggedPiece) {
             this.ctx.strokeStyle = '#ff1493';
             this.ctx.lineWidth = 3;
@@ -304,7 +313,6 @@
           }
         });
 
-        // Інструкція
         this.ctx.fillStyle = 'white';
         this.ctx.font = 'bold 28px "Comic Sans MS"';
         this.ctx.textAlign = 'center';
@@ -350,7 +358,6 @@
         const srcPieceWidth = img.width / cols;
         const srcPieceHeight = img.height / rows;
 
-        // Створюємо проміси для кожного шматочка
         const piecePromises = [];
 
         for (let row = 0; row < rows; row++) {
@@ -362,7 +369,6 @@
           }
         }
 
-        // Чекаємо на створення всіх шматочків
         this.pieces = await Promise.all(piecePromises);
         this.shufflePieces();
       }
@@ -414,11 +420,9 @@
           canvas.height = size;
           const ctx = canvas.getContext('2d');
           
-          // Кольоровий квадрат
           ctx.fillStyle = colors[i % colors.length];
           ctx.fillRect(0, 0, size, size);
           
-          // Номер
           ctx.fillStyle = 'white';
           ctx.font = 'bold 40px "Comic Sans MS"';
           ctx.textAlign = 'center';
@@ -458,7 +462,6 @@
           const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
           const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
           
-          // Шукаємо шматочок для перетягування
           for (let i = this.pieces.length - 1; i >= 0; i--) {
             const piece = this.pieces[i];
             if (x >= piece.x && x <= piece.x + piece.width &&
@@ -468,7 +471,6 @@
               this.dragOffset.x = x - piece.x;
               this.dragOffset.y = y - piece.y;
               
-              // Переміщуємо на передній план
               this.pieces.splice(i, 1);
               this.pieces.push(piece);
               break;
@@ -493,7 +495,6 @@
         const endDrag = () => {
           if (!this.draggedPiece) return;
           
-          // Перевіряємо чи шматочок на місці
           const targetX = this.draggedPiece.targetX;
           const targetY = this.draggedPiece.targetY;
           const distance = Math.hypot(
@@ -512,7 +513,6 @@
           this.render();
         };
 
-        // Додаємо обробники подій
         canvas.addEventListener('mousedown', startDrag);
         canvas.addEventListener('touchstart', startDrag, { passive: false });
         canvas.addEventListener('mousemove', drag);
@@ -542,7 +542,6 @@
       }
 
       destroy() {
-        // Очищаємо події
         const canvas = this.renderer.canvas;
         const newCanvas = canvas.cloneNode(true);
         canvas.parentNode.replaceChild(newCanvas, canvas);
@@ -557,12 +556,18 @@
       constructor() {
         this.sceneEl = document.querySelector('a-scene');
         this.isInitialized = false;
+        this.camera = this.sceneEl.querySelector('a-camera');
       }
 
       initialize() {
         if (this.isInitialized) return;
         
-        // Додаємо маркери для всіх пазлів
+        // Активуємо камеру
+        if (this.camera) {
+          this.camera.setAttribute('active', 'true');
+        }
+
+        // Додаємо маркери
         PUZZLES.forEach(config => {
           const entity = document.createElement('a-entity');
           entity.setAttribute('mindar-image-target', `targetIndex: ${config.id}`);
@@ -590,9 +595,36 @@
     const arController = new MindARController();
 
     // Обробка подій
-    document.getElementById('startBtn').addEventListener('click', () => {
-      screens.show('hint');
-      arController.initialize();
+    document.getElementById('startBtn').addEventListener('click', async () => {
+      try {
+        // Запитуємо доступ до камери
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        screens.show('loading');
+
+        // Ініціалізуємо AR
+        arController.initialize();
+
+        // Чекаємо, поки сцена завантажиться
+        const scene = document.querySelector('a-scene');
+        scene.addEventListener('loaded', () => {
+          console.log('✅ A-Frame сцена завантажена');
+          screens.show('hint');
+        });
+
+        // Додаємо логування для AR
+        scene.addEventListener('mindar-image-target-found', (e) => {
+          console.log('🎯 Target found:', e.detail.targetIndex);
+        });
+
+        scene.addEventListener('mindar-image-target-lost', (e) => {
+          console.log('❌ Target lost:', e.detail.targetIndex);
+        });
+
+      } catch (err) {
+        alert("Будь ласка, дайте доступ до камери, щоб почати гру!");
+        console.error("Доступ до камери відмовлено:", err);
+        screens.show('start');
+      }
     });
 
     document.getElementById('closeBtn').addEventListener('click', () => {
@@ -606,13 +638,6 @@
     // Ініціалізація при завантаженні
     document.addEventListener('DOMContentLoaded', () => {
       screens.show('start');
-      
-      // Ініціалізуємо AR коли сцена завантажиться
-      const scene = document.querySelector('a-scene');
-      scene.addEventListener('loaded', () => {
-        console.log('✅ A-Frame сцена завантажена');
-        // AR вже запущено через autoStart: true
-      });
     });
   </script>
 </body>
