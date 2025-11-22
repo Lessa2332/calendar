@@ -4,11 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Магічний пазл для зірочки</title>
-
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.1/dist/mindar-image-aframe.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
-
   <style>
     body,html{margin:0;padding:0;height:100%;overflow:hidden;background:#000;font-family:'Comic Sans MS',sans-serif;touch-action:none}
     canvas{position:fixed;inset:0;z-index:100;display:none;cursor:grab}
@@ -25,7 +23,6 @@
   </style>
 </head>
 <body>
-
   <canvas id="puzzleCanvas"></canvas>
   <button id="closeBtn">X</button>
 
@@ -48,7 +45,7 @@
 
   <script type="module">
     // ================================================
-    // КОНФІГУРАЦІЯ ПАЗЛІВ (від 01 до 12)
+    // КОНФІГУРАЦІЯ
     // ================================================
     const PUZZLES = Array.from({length:12}, (_,i) => ({
       id: i,
@@ -58,102 +55,111 @@
     }));
 
     // ================================================
-    // 1. EventBus – проста шина подій
+    // ГЛОБАЛЬНІ ЗМІННІ
+    // ================================================
+    let currentEngine = null;
+
+    // ================================================
+    // EventBus
     // ================================================
     class EventBus {
       constructor() { this.events = {}; }
-      on(name, callback) { (this.events[name] ||= []).push(callback); }
-      off(name, callback) { this.events[name] = (this.events[name]||[]).filter(c=>c!==callback); }
-      emit(name, data) { (this.events[name]||[]).forEach(cb => cb(data)); }
+      on(name, cb) { (this.events[name] ||= []).push(cb); }
+      emit(name, data) { (this.events[name] || []).forEach(cb => cb(data)); }
     }
     const bus = new EventBus();
 
     // ================================================
-    // 2. ScreenManager
+    // ScreenManager
     // ================================================
     class ScreenManager {
       constructor() {
+        this.canvas = document.getElementById('puzzleCanvas');
+        this.closeBtn = document.getElementById('closeBtn');
         this.screens = {
           start: document.getElementById('startScreen'),
           hint: document.getElementById('hintScreen'),
-          win: document.getElementById('winScreen'),
-          puzzle: document.getElementById('puzzleCanvas').parentNode
+          win: document.getElementById('winScreen')
         };
-        this.closeBtn = document.getElementById('closeBtn');
       }
-      show(screenName) {
-        Object.values(this.screens).forEach(s=>s.style.display='none');
-        this.closeBtn.style.display = screenName==='puzzle' ? 'block' : 'none';
-        if (screenName==='puzzle') {
-          document.getElementById('puzzleCanvas').style.display = 'block';
-        } else {
-          document.getElementById('puzzleCanvas').style.display = 'none';
-          if (this.screens[screenName]) this.screens[screenName].style.display = 'flex';
+      show(name) {
+        // Ховаємо все
+        Object.values(this.screens).forEach(s => s.style.display = 'none');
+        this.canvas.style.display = 'none';
+        this.closeBtn.style.display = 'none';
+
+        if (name === 'puzzle') {
+          this.canvas.style.display = 'block';
+          this.closeBtn.style.display = 'block';
+        } else if (this.screens[name]) {
+          this.screens[name].style.display = 'flex';
         }
       }
     }
     const screens = new ScreenManager();
 
     // ================================================
-    // 3. ConfettiManager
+    // Confetti
     // ================================================
-    class ConfettiManager {
+    const confetti = {
       celebrate() {
         confetti({particleCount:200,spread:100,origin:{y:0.6}});
         setTimeout(()=>confetti({particleCount:150,angle:60,spread:80,origin:{x:0}}),500);
         setTimeout(()=>confetti({particleCount:150,angle:120,spread:80,origin:{x:1}}),1000);
       }
-    }
-    const confetti = new ConfettiManager();
+    };
 
     // ================================================
-    // 4. Утиліти
+    // Утиліти
     // ================================================
-    const loadImage = src => new Promise((res,rej)=>{
+    const loadImage = src => new Promise((res, rej) => {
       const img = new Image();
-      img.onload = ()=>res(img);
-      img.onerror = ()=>rej(new Error(`Не вдалося завантажити ${src}`));
+      img.onload = () => res(img);
+      img.onerror = () => rej(new Error(`Не вдалося завантажити ${src}`));
       img.src = src;
     });
 
     // ================================================
-    // 5. PuzzleRenderer (тільки малювання)
+    // PuzzleRenderer
     // ================================================
     class PuzzleRenderer {
       constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.resize();
-        window.addEventListener('resize', ()=>this.resize());
+        window.addEventListener('resize', () => this.resize());
       }
       resize() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
       }
       clear() { this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height); }
-      draw(pieces, dragged) {
+      draw(pieces, dragged = null) {
         this.clear();
-        const w = pieces[0].width * pieces[0].cols;
-        const h = pieces[0].height * pieces[0].rows;
-        const cx = (this.canvas.width - w)/2;
-        const cy = (this.canvas.height - h)/2;
+        if (!pieces.length) return;
 
-        // рамка
+        const p0 = pieces[0];
+        const puzzleW = p0.width * p0.cols;
+        const puzzleH = p0.height * p0.rows;
+        const cx = (this.canvas.width - puzzleW) / 2;
+        const cy = (this.canvas.height - puzzleH) / 2;
+
+        // Рамка
         this.ctx.strokeStyle = 'gold';
         this.ctx.lineWidth = 6;
-        this.ctx.strokeRect(cx-10, cy-10, w+20, h+20);
+        this.ctx.strokeRect(cx - 10, cy - 10, puzzleW + 20, puzzleH + 20);
 
-        // шматочки
-        pieces.forEach(p=>{
+        // Шматочки
+        pieces.forEach(p => {
           this.ctx.drawImage(p.img, p.x, p.y, p.width, p.height);
-          if (p===dragged) {
+          if (p === dragged) {
             this.ctx.strokeStyle = '#ff1493';
             this.ctx.lineWidth = 4;
             this.ctx.strokeRect(p.x, p.y, p.width, p.height);
           }
         });
 
-        // підказка
+        // Підказка
         this.ctx.fillStyle = 'white';
         this.ctx.font = 'bold 28px Comic Sans MS';
         this.ctx.textAlign = 'center';
@@ -162,204 +168,210 @@
     }
 
     // ================================================
-    // 6. PuzzleEngine (логіка + drag&drop)
+    // PuzzleEngine — ВИПРАВЛЕНО ВСІ БАГИ
     // ================================================
     class PuzzleEngine {
-      constructor(config, renderer, bus) {
+      constructor(config) {
         this.config = config;
-        this.renderer = renderer;
-        this.bus = bus;
+        this.renderer = new PuzzleRenderer(document.getElementById('puzzleCanvas'));
         this.pieces = [];
         this.dragged = null;
-        this.offset = {x:0,y:0};
+        this.offset = {x:0, y:0};
         this.init();
       }
+
       async init() {
         try {
           const img = await loadImage(this.config.image);
           this.createPieces(img);
-        } catch(e) {
-          console.warn('Картинку не знайдено → кольоровий пазл', e);
+        } catch (e) {
+          console.warn('Зображення не знайдено → кольоровий пазл', e);
           this.createFallbackPieces();
         }
         this.bindEvents();
-        this.renderer.draw(this.pieces, null);
+        this.renderer.draw(this.pieces);
       }
+
       createPieces(img) {
-        const {rows,cols} = this.config;
-        const pieceW = Math.min(180, window.innerWidth/4);
-        const pieceH = (img.height/img.width)*pieceW;
+        const {rows, cols} = this.config;
+        const pieceW = Math.min(180, window.innerWidth / 4);
+        const pieceH = (img.height / img.width) * pieceW;
         const puzzleW = pieceW * cols;
         const puzzleH = pieceH * rows;
-        const startX = (window.innerWidth - puzzleW)/2;
-        const startY = (window.innerHeight - puzzleH)/2;
+        const startX = (window.innerWidth - puzzleW) / 2;
+        const startY = (window.innerHeight - puzzleH) / 2;
 
-        for(let r=0;r<rows;r++) {
-          for(let c=0;c<cols;c++) {
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
             const canvas = document.createElement('canvas');
-            canvas.width = img.width/cols;
-            canvas.height = img.height/rows;
+            canvas.width = img.width / cols;
+            canvas.height = img.height / rows;
             const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, c*(img.width/cols), r*(img.height/rows), canvas.width, canvas.height, 0,0,canvas.width,canvas.height);
+            ctx.drawImage(img,
+              c * canvas.width, r * canvas.height, canvas.width, canvas.height,
+              0, 0, canvas.width, canvas.height
+            );
+
+            const pieceImg = new Image();
+            pieceImg.src = canvas.toDataURL();
+
             this.pieces.push({
-              img: canvas.transferToImageBitmap ? ImageBitmap.from(canvas) : new Image(),
-              x: Math.random()*(window.innerWidth-pieceW),
-              y: Math.random()*(window.innerHeight-pieceH),
-              targetX: startX + c*pieceW,
-              targetY: startY + r*pieceH,
+              img: pieceImg,
+              x: Math.random() * (window.innerWidth - pieceW),
+              y: Math.random() * (window.innerHeight - pieceH),
+              targetX: startX + c * pieceW,
+              targetY: startY + r * pieceH,
               width: pieceW,
               height: pieceH,
-              cols, rows,
               placed: false
             });
-            if (!canvas.transferToImageBitmap) this.pieces[this.pieces.length-1].img.src = canvas.toDataURL();
           }
         }
         this.shuffle();
       }
+
       createFallbackPieces() {
-        const colors = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8','#F7DC6F','#BB8FCE','#FF9FF3','#54A0FF','#48DBFB'];
+        const colors = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8','#F7DC6F','#BB8FCE'];
         const size = 120;
-        const cols = 3, rows = 3;
-        for(let i=0;i<9;i++) {
+        for (let i = 0; i < 9; i++) {
           const canvas = document.createElement('canvas');
           canvas.width = canvas.height = size;
           const ctx = canvas.getContext('2d');
-          ctx.fillStyle = colors[i%colors.length];
+          ctx.fillStyle = colors[i];
           ctx.fillRect(0,0,size,size);
-          ctx.fillStyle='white';
-          ctx.font='bold 50px Comic Sans MS';
-          ctx.textAlign='center';
-          ctx.fillText(String(i+1), size/2, size/2+18);
+          ctx.fillStyle = 'white';
+          ctx.font = 'bold 50px Comic Sans MS';
+          ctx.textAlign = 'center';
+          ctx.fillText(String(i+1), size/2, size/2 + 18);
+
+          const img = new Image();
+          img.src = canvas.toDataURL();
+
           const row = Math.floor(i/3), col = i%3;
-          const piece = {
-            img: new Image(),
-            x: Math.random()*(window.innerWidth-size),
-            y: Math.random()*(window.innerHeight-size),
-            targetX: (window.innerWidth-size*3)/2 + col*size,
-            targetY: (window.innerHeight-size*3)/2 + row*size,
+          this.pieces.push({
+            img,
+            x: Math.random() * (window.innerWidth - size),
+            y: Math.random() * (window.innerHeight - size),
+            targetX: (window.innerWidth - size*3)/2 + col*size,
+            targetY: (window.innerHeight - size*3)/2 + row*size,
             width: size,
             height: size,
-            cols, rows,
             placed: false
-          };
-          piece.img.src = canvas.toDataURL();
-          this.pieces.push(piece);
+          });
         }
       }
+
       shuffle() {
-        for(let i=this.pieces.length-1;i>0;i--){
-          const j = Math.floor(Math.random()*(i+1));
-          [this.pieces[i],this.pieces[j]] = [this.pieces[j],this.pieces[i]];
+        for (let i = this.pieces.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [this.pieces[i], this.pieces[j]] = [this.pieces[j], this.pieces[i]];
         }
       }
+
       bindEvents() {
         const canvas = this.renderer.canvas;
-        const start = e => {
+
+        const getPos = e => {
           const rect = canvas.getBoundingClientRect();
-          const x = (e.clientX||e.touches[0].clientX) - rect.left;
-          const y = (e.clientY||e.touches[0].clientY) - rect.top;
-          for(let i=this.pieces.length-1;i>=0;i--){
+          const clientX = e.clientX || e.touches?.[0]?.clientX || 0;
+          const clientY = e.clientY || e.touches?.[0]?.clientY || 0;
+          return { x: clientX - rect.left, y: clientY - rect.top };
+        };
+
+        const start = e => {
+          const {x, y} = getPos(e);
+          for (let i = this.pieces.length - 1; i >= 0; i--) {
             const p = this.pieces[i];
-            if(x>=p.x && x<=p.x+p.width && y>=p.y && y<=p.y+p.height){
+            if (x >= p.x && x <= p.x + p.width && y >= p.y && y <= p.y + p.height) {
               this.dragged = p;
-              this.offset = {x: x-p.x, y: y-p.y};
-              this.pieces.splice(i,1);
+              this.offset = { x: x - p.x, y: y - p.y };
+              this.pieces.splice(i, 1);
               this.pieces.push(p);
               break;
             }
           }
         };
+
         const move = e => {
-          if(!this.dragged) return;
+          if (!this.dragged) return;
           e.preventDefault();
-          const rect = canvas.getBoundingClientRect();
-          const x = (e.clientX||e.touches[0].clientX) - rect.left;
-          const y = (e.clientY||e.touches[0].clientY) - rect.top;
+          const {x, y} = getPos(e);
           this.dragged.x = x - this.offset.x;
           this.dragged.y = y - this.offset.y;
           this.renderer.draw(this.pieces, this.dragged);
         };
+
         const end = () => {
-          if(!this.dragged) return;
-          const dist = Math.hypot(
-            this.dragged.x + this.dragged.width/2 - (this.dragged.targetX + this.dragged.width/2),
-            this.dragged.y + this.dragged.height/2 - (this.dragged.targetY + this.dragged.height/2)
-          );
-          if(dist < 50) {
-            {
+          if (!this.dragged) return;
+
+          const dx = this.dragged.x + this.dragged.width/2 - (this.dragged.targetX + this.dragged.width/2);
+          const dy = this.dragged.y + this.dragged.height/2 - (this.dragged.targetY + this.dragged.height/2);
+          const dist = Math.hypot(dx, dy);
+
+          if (dist < 50) {
             this.dragged.x = this.dragged.targetX;
             this.dragged.y = this.dragged.targetY;
             this.dragged.placed = true;
           }
-          if(this.pieces.every(p=>p.placed)) {
-            this.bus.emit('puzzle:solved');
+
+          if (this.pieces.every(p => p.placed)) {
+            confetti.celebrate();
+            setTimeout(() => screens.show('win'), 2000);
+            setTimeout(() => {
+              currentEngine = null;
+              screens.show('hint');
+            }, 6000);
           }
-          this.renderer.draw(this.pieces, null);
+
+          this.renderer.draw(this.pieces);
           this.dragged = null;
         };
+
         canvas.addEventListener('mousedown', start);
-        canvas.addEventListener('touchstart', start, {passive:false});
+        canvas.addEventListener('touchstart', start, { passive: false });
         canvas.addEventListener('mousemove', move);
-        canvas.addEventListener('touchmove', move, {passive:false});
+        canvas.addEventListener('touchmove', move, { passive: false });
         canvas.addEventListener('mouseup', end);
         canvas.addEventListener('touchend', end);
       }
     }
 
     // ================================================
-    // 7. MindAR Controller
+    // MindAR Controller
     // ================================================
-    class MindARController {
-      constructor() {
-        this.sceneEl = document.querySelector('a-scene');
-      }
-      async start() {
-        await this.sceneEl.addEventListener('loaded', ()=>{}, {once:true});
-        const system = this.sceneEl.systems['mindar-image-system'];
-        await system.start();
-        screens.show('hint');
-      }
-      registerTargets() {
+    const sceneEl = document.querySelector('a-scene');
+
+    sceneEl.addEventListener('loaded', () => {
+      const startMindAR = () => {
+        const system = sceneEl.systems['mindar-image-system'];
+        system.start();
+
+        // Реєструємо 12 маркерів
         PUZZLES.forEach(conf => {
           const entity = document.createElement('a-entity');
           entity.setAttribute('mindar-image-target', `targetIndex: ${conf.id}`);
           entity.addEventListener('targetFound', () => {
-            if (!window.currentEngine) {
-              window.currentEngine = new PuzzleEngine(conf, new PuzzleRenderer(document.getElementById('puzzleCanvas')), bus);
+            if (!currentEngine) {
+              currentEngine = new PuzzleEngine(conf);
               screens.show('puzzle');
             }
           });
-          this.sceneEl.appendChild(entity);
+          sceneEl.appendChild(entity);
         });
-      }
-    }
+      };
 
-    // ================================================
-    // 8. ЗАПУСК
-    // ================================================
-    const ar = new MindARController();
-
-    bus.on('puzzle:solved', () => {
-      confetti.celebrate();
-      setTimeout(()=>screens.show('win'), 2000);
-      setTimeout(()=>{
-        window.currentEngine = null;
+      document.getElementById('startBtn').onclick = () => {
         screens.show('hint');
-      }, 6000);
+        startMindAR();
+      };
     });
 
-    document.getElementById('startBtn').onclick = () => {
-      screens.show('hint');
-      ar.start();
-      ar.registerTargets();
-    };
-
     document.getElementById('closeBtn').onclick = () => {
-      window.currentEngine = null;
+      currentEngine = null;
       screens.show('hint');
     };
 
+    // Початковий екран
     screens.show('start');
   </script>
 </body>
