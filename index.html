@@ -10,18 +10,17 @@
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 
   <style>
-    * {box-sizing:border-box}
-    body,html{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:'Comic Sans MS',cursive,touch-action:none}
-    canvas{position:fixed;inset:0;z-index:100;display:none;background:transparent;image-rendering:pixelated}
-    #closeBtn{position:fixed;top:15px;right:15px;width:60px;height:60px;font-size:32px;z-index:101;background:#ff1493;color:white;border:none;border-radius:50%;box-shadow:0 0 30px #ff1493;display:none;cursor:pointer}
-    .screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:white;z-index:999;background:rgba(0,0,0,0.75);text-align:center;backdrop-filter:blur(8px)}
-    #startScreen{background:radial-gradient(circle at center, rgba(255,20,147,0.9), transparent)}
-    #winScreen{color:gold}
-    #winScreen h1{animation:heartBeat 1.5s infinite}
-    @keyframes heartBeat{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
-    button{background:#ff1493;color:white;border:none;padding:20px 50px;border-radius:50px;font-size:32px;cursor:pointer;box-shadow:0 0 50px #ff1493;margin:15px;transition:0.3s}
-    button:hover{transform:scale(1.08);box-shadow:0 0 70px #ff69b4}
-    #preview{width:160px;height:160px;border:6px solid gold;border-radius:25px;box-shadow:0 0 40px gold;margin:25px}
+    body, html {margin:0;padding:0;height:100%;overflow:hidden;background:transparent;font-family:'Comic Sans MS',cursive,sans-serif;touch-action:none}
+    canvas {position:fixed;inset:0;z-index:100;display:none;background:transparent}
+    #closeBtn {position:fixed;top:20px;right:20px;width:60px;height:60px;font-size:32px;z-index:101;background:#ff1493;color:white;border:none;border-radius:50%;box-shadow:0 0 30px #ff1493;display:none;cursor:pointer}
+    .screen {position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:white;z-index:999;background:rgba(0,0,0,0.75);text-align:center;backdrop-filter:blur(5px)}
+    #startScreen {background:radial-gradient(circle at center, rgba(255,20,147,0.9), transparent)}
+    #winScreen {color:gold}
+    #winScreen h1 {animation:pulse 1.5s infinite}
+    @keyframes pulse {0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+    button {background:#ff1493;color:white;border:none;padding:20px 50px;border-radius:50px;font-size:32px;cursor:pointer;box-shadow:0 0 50px #ff1493;margin:20px;transition:0.3s}
+    button:hover {transform:scale(1.08)}
+    #preview {width:160px;height:160px;border:6px solid gold;border-radius:25px;box-shadow:0 0 40px gold;margin:25px}
   </style>
 </head>
 <body>
@@ -30,25 +29,24 @@
   <button id="closeBtn">X</button>
 
   <div id="startScreen" class="screen">
-    <h1 style="font-size:52px;margin:0">Магічний пазл</h1>
-    <p style="font-size:28px;margin:20px 0">12 чарівних картинок чекають на тебе</p>
+    <h1 style="font-size:52px">Магічний пазл</h1>
+    <p style="font-size:26px">12 чарівних картинок для тебе</p>
     <button id="startBtn">ПОЧАТИ МАГІЮ!</button>
   </div>
 
   <div id="hintScreen" class="screen" style="display:none">
     <h2 style="font-size:38px">Знайди цю картинку!</h2>
     <img id="preview" src="" alt="Маркер">
-    <p style="font-size:26px;margin-top:30px">Покажи її камері</p>
+    <p style="font-size:26px">Покажи камері</p>
   </div>
 
   <div id="winScreen" class="screen" style="display:none">
-    <h1 style="font-size:56px">УРАААА!</h1>
-    <p style="font-size:36px">Ти — справжня чарівниця!</p>
+    <h1 style="font-size:58px">УРААА!</h1>
+    <p style="font-size:36px">Ти — найкраща чарівниця!</p>
   </div>
 
-  <a-scene
-    embedded
-    mindar-image="imageTargetSrc: ./calendar.mind; uiLoading: no; uiScanning: no; uiError: no; filterMinCF:0.0001; filterBeta:0.001"
+  <a-scene embedded
+    mindar-image="imageTargetSrc: ./calendar.mind; uiLoading:no; uiScanning:no; uiError:no; filterMinCF:0.0001; filterBeta:0.001"
     renderer="colorManagement:true; antialias:true"
     vr-mode-ui="enabled:false"
     device-orientation-permission-ui="enabled:false"
@@ -58,166 +56,185 @@
 
   <script>
     const PUZZLES = Array.from({length:12},(_,i)=>({
-      id:i,
-      image:`images/${String(i+1).padStart(2,'0')}.jpg`,
-      rows:3,cols:3
+      id: i,
+      image: `images/${String(i+1).padStart(2,'0')}.jpg`,
+      rows: 3,
+      cols: 3
     }));
 
     let currentPuzzle = null;
-    let gameStarted = false;
+    let started = false;
 
-    class ScreenManager{
-      constructor(){
-        this.screens={start:document.getElementById('startScreen'),hint:document.getElementById('hintScreen'),win:document.getElementById('winScreen')};
-        this.canvas=document.getElementById('puzzleCanvas');
-        this.closeBtn=document.getElementById('closeBtn');
+    // === Управління екранами ===
+    const screens = {
+      show(name) {
+        document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+        document.getElementById('puzzleCanvas').style.display = 'none';
+        document.getElementById('closeBtn').style.display = 'none';
+        if (name === 'puzzle') {
+          document.getElementById('puzzleCanvas').style.display = 'block';
+          document.getElementById('closeBtn').style.display = 'block';
+        } else {
+          document.getElementById(name + 'Screen').style.display = 'flex';
+        }
       }
-      show(name){
-        Object.values(this.screens).forEach(s=>s&&s.style.setProperty('display','none'));
-        this.canvas.style.display='none';
-        this.closeBtn.style.display='none';
-        if(name==='start') this.screens.start.style.display='flex';
-        if(name==='hint') this.screens.hint.style.display='flex';
-        if(name==='win') this.screens.win.style.display='flex';
-        if(name==='puzzle'){this.canvas.style.display='block';this.closeBtn.style.display='block';}
+    };
+
+    // === Завантаження зображень ===
+    const loadImage = src => new Promise((res, rej) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => res(img);
+      img.onerror = rej;
+      img.src = src;
+    });
+
+    // === Рендер пазлу ===
+    class PuzzleRenderer {
+      constructor(canvas) {
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d', {alpha: true});
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
       }
-    }
-    const screens = new ScreenManager();
-
-    function loadImage(src){return new Promise((r,j)=>{const i=new Image();i.crossOrigin="anonymous";i.onload=()=>r(i);i.onerror=j;i.src=src;})}
-
-    class PuzzleRenderer{
-      constructor(c){this.canvas=c;this.ctx=c.getContext('2d',{alpha:true});this.resize();window.addEventListener('resize',()=>this.resize());}
-      resize(){this.canvas.width=innerWidth;this.canvas.height=innerHeight;}
-      render(pieces,dragged){
+      resize() { this.canvas.width = innerWidth; this.canvas.height = innerHeight; }
+      render(pieces, dragged) {
         this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
-        if(!pieces?.length)return;
-        const w=pieces[0].width,h=pieces[0].height;
-        const pw=w*3,ph=h*3;
-        const cx=(this.canvas.width-pw)/2,cy=(this.canvas.height-ph)/2;
-        this.ctx.strokeStyle='gold';this.ctx.lineWidth=5;this.ctx.strokeRect(cx-10,cy-10,pw+20,ph+20);
-        pieces.forEach(p=>{
-          this.ctx.drawImage(p.image,p.x,p.y,w,h);
-          if(p===dragged){this.ctx.strokeStyle='#ff1493';this.ctx.lineWidth=4;this.ctx.strokeRect(p.x,p.y,w,h);}
+        if (!pieces?.length) return;
+        const w = pieces[0].width, h = pieces[0].height;
+        const pw = w*3, ph = h*3;
+        const cx = (this.canvas.width-pw)/2, cy = (this.canvas.height-ph)/2;
+        this.ctx.strokeStyle = 'gold'; this.ctx.lineWidth = 6;
+        this.ctx.strokeRect(cx-10, cy-10, pw+20, ph+20);
+        pieces.forEach(p => {
+          this.ctx.drawImage(p.image, p.x, p.y, w, h);
+          if (p === dragged) && (this.ctx.strokeStyle = '#ff1493', this.ctx.lineWidth = 4, this.ctx.strokeRect(p.x, p.y, w, h));
         });
-        this.ctx.fillStyle='rgba(255,255,255,0.9)';this.ctx.font='bold 28px "Comic Sans MS"';this.ctx.textAlign='center';
-        this.ctx.fillText('Перетягуй шматочки пальчиком!',this.canvas.width/2,70);
+        this.ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        this.ctx.font = 'bold 28px "Comic Sans MS"';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('Перетягуй шматочки пальчиком!', this.canvas.width/2, 70);
       }
     }
 
-    class PuzzleEngine{
-      constructor(config,renderer){
-        this.config=config;this.renderer=renderer;this.pieces=[];this.dragged=null;this.offset={x:0,y:0};
+    // === Логіка пазлу ===
+    class PuzzleEngine {
+      {
+      constructor(config, renderer) {
+        this.cfg = config; this.r = renderer; this.p = []; this.drag = null; this.off = {x:0,y:0};
         this.init();
       }
-      async init(){
-        try{
-          const img=await loadImage(this.config.image);
+      async init() {
+        try {
+          const img = await loadImage(this.cfg.image);
           await this.createPieces(img);
-        }catch(e){
-          console.warn('Зображення не завантажилось – fallback',e);
-          this.createFallback();
+        } catch {
+          this.fallback();
         }
-        this.bindEvents();this.renderer.render(this.pieces);
+        this.bind(); this.r.render(this.p);
       }
-      async createPieces(img){
-        const pw=Math.min(210,innerWidth/3.4);
-        const ph=(img.height/img.width)*pw;
-        const totalW=pw*3,totalH=ph*3;
-        const startX=(innerWidth-totalW)/2,startY=(innerHeight-totalH)/2;
-        const sw=img.width/3,sh=img.height/3;
-        for(let r=0;r<3;r++)for(let c=0;c<3;c++){
-          const canvas=document.createElement('canvas');
-          canvas.width=sw;canvas.height=sh;
-          const ctx=canvas.getContext('2d');
-          ctx.drawImage(img,c*sw,r*sh,sw,sh,0,0,sw,sh);
-          const i=new Image();i.src=canvas.toDataURL();
-          await new Promise(res=>i.onload=res);
-          this.pieces.push({
-            image:i,width:pw,height:ph,
-            x:Math.random()*(innerWidth-pw),y:Math.random()*(innerHeight-ph),
-            targetX:startX+c*pw,targetY:startY+r*ph,isInPlace:false
-          });
+      async createPieces(img) {
+        const sz = Math.min(210, innerWidth/3.4);
+        const ph = (img.height/img.width)*sz;
+        const totalW = sz*3, totalH = ph*3;
+        const ox = (innerWidth-totalW)/2, oy = (innerHeight-totalH)/2;
+        const sw = img.width/3, sh = img.height/3;
+        for (let r=0; r<3; r++) for (let c=0; c<3; c++) {
+          const cv = document.createElement('canvas'); cv.width = sw; cv.height = sh;
+          cv.getContext('2d').drawImage(img, c*sw, r*sh, sw, sh, 0, 0, sw, sh);
+          const i = new Image(); i.src = cv.toDataURL();
+          await new Promise(res => i.onload = res);
+          this.p.push({image:i, width:sz, height:ph, x:Math.random()*(innerWidth-sz), y:Math.random()*(innerHeight-ph),
+                       tx:ox+c*sz, ty:oy+r*ph, ok:false});
         }
         this.shuffle();
       }
-      createFallback(){
-        const colors=['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8','#F7DC6F','#BB8FCE'];
-        const s=130;
-        for(let i=0;i<9;i++){
-          const c=document.createElement('canvas');c.width=c.height=s;
-          const ctx=c.getContext('2d');
-          ctx.fillStyle=colors[i];ctx.fillRect(0,0,s,s);
-          ctx.fillStyle='white';ctx.font='bold 48px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
-          ctx.fillText(i+1,s/2,s/2);
-          const img=new Image();img.src=c.toDataURL();
-          const row=Math.floor(i/3),col=i%3;
-          this.pieces.push({image:img,width:s,height:s,
-            x:Math.random()*(innerWidth-s),y:Math.random()*(innerHeight-s),
-            targetX:(innerWidth-s*3)/2+col*s,targetY:(innerHeight-s*3)/2+row*s,isInPlace:false});
+      fallback() {
+        const cols = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8','#F7DC6F','#BB8FCE'];
+        const s = 130;
+        for (let i=0; i<9; i++) {
+          const cv = document.createElement('canvas'); cv.width = cv.height = s;
+          const ctx = cv.getContext('2d');
+          ctx.fillStyle = cols[i]; ctx.fillRect(0,0,s,s);
+          ctx.fillStyle='white'; ctx.font='bold 48px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+          ctx.fillText(i+1, s/2, s/2);
+          const img = new Image(); img.src = cv.toDataURL();
+          const row = Math.floor(i/3), col = i%3;
+          this.p.push({image:img,width:s,height:s,
+                       x:Math.random()*(innerWidth-s),y:Math.random()*(innerHeight-s),
+                       tx:(innerWidth-s*3)/2+col*s, ty:(innerHeight-s*3)/2+row*s, ok:false});
         }
       }
-      shuffle(){for(let i=this.pieces.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[this.pieces[i],this.pieces[j]]=[this.pieces[j],this.pieces[i]];}}
-      bindEvents(){
-        const c=this.renderer.canvas;
-        const start=e=>{const r=c.getBoundingClientRect();let x=(e.clientX||e.touches[0].clientX)-r.left,y=(e.clientY||e.touches[0].clientY)-r.top;
-          for(let i=this.pieces.length-1;i>=0;i--){
-            const p=this.pieces[i];
-            if(x>p.x&&x<p.x+p.width&&y>p.y&&y<p.y+p.height){
-              this.dragged=p;this.offset={x:x-p.x,y:y-p.y};
-              this.pieces.splice(i,1);this.pieces.push(p);break;
+      shuffle() { for (let i=this.p.length-1; i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [this.p[i],this.p[j]]=[this.p[j],this.p[i]]; } }
+      bind() {
+        const c = this.r.canvas;
+        const start = e => {
+          const r = c.getBoundingClientRect();
+          const x = (e.clientX || e.touches?.[0].clientX) - r.left;
+          const y = (e.clientY || e.touches?.[0].clientY) - r.top;
+          for (let i=this.p.length-1; i>=0; i--) {
+            const p = this.p[i];
+            if (x>p.x && x<p.x+p.width && y>p.y && y<p.y+p.height) {
+              this.drag = p; this.off = {x:x-p.x, y:y-p.y};
+              this.p.splice(i,1); this.p.push(p); break;
             }
           }
         };
-        const move=e=>{if(!this.dragged)return;e.preventDefault();const r=c.getBoundingClientRect();
-          let x=(e.clientX||e.touches[0].clientX)-r.left,y=(e.clientY||e.touches[0].clientY)-r.top;
-          this.dragged.x=x-this.offset.x;this.dragged.y=y-this.offset.y;this.renderer.render(this.pieces,this.dragged);
+        const move = e => { if(!this.drag) return; e.preventDefault();
+          const r = c.getBoundingClientRect();
+          const x = (e.clientX || e.touches?.[0].clientX) - r.left;
+          const y = (e.clientY || e.touches?.[0].clientY) - r.top;
+          this.drag.x = x - this.off.x; this.drag.y = y - this.off.y;
+          this.r.render(this.p, this.drag);
         };
-        const end=()=>{if(!this.dragged)return;
-          const d=Math.hypot(this.dragged.x+this.dragged.width/2-(this.dragged.targetX+this.dragged.width/2),
-                             this.dragged.y+this.dragged.height/2-(this.dragged.targetY+this.dragged.height/2));
-          if(d<45){
-            this.dragged.x=this.dragged.targetX;this.dragged.y=this.dragged.targetY;this.dragged.isInPlace=true;
-            this.checkWin();
-          }
-          this.dragged=null;this.renderer.render(this.pieces);
+        const end = () => { if(!this.drag) return;
+          const d = Math.hypot(this.drag.x+this.drag.width/2 - (this.drag.tx+this.drag.width/2),
+                               this.drag.y+this.drag.height/2 - (this.drag.ty+this.drag.height/2));
+          if (d < 45) { this.drag.x = this.drag.tx; this.drag.y = this.drag.ty; this.drag.ok = true; this.check(); }
+          this.drag = null; this.r.render(this.p);
         };
-        c.addEventListener('mousedown',start);c.addEventListener('touchstart',start,{passive:false});
-        c.addEventListener('mousemove',move);c.addEventListener('touchmove',move,{passive:false});
-        c.addEventListener('mouseup',end);c.addEventListener('touchend',end);
+        c.addEventListener('mousedown',start); c.addEventListener('touchstart',start,{passive:false});
+        c.addEventListener('mousemove',move); c.addEventListener('touchmove',move,{passive:false});
+        c.addEventListener('mouseup',end); c.addEventListener('touchend',end);
       }
-      checkWin(){
-        if(this.pieces.every(p=>p.isInPlace)){
-          confetti({particleCount:400,spread:100,origin:{y:0.6}});
-          setTimeout(()=>{confetti({particleCount:200,angle:60,spread:80,origin:{x:0}});},300);
-          setTimeout(()=>{confetti({particleCount:200,angle:120,spread:80,origin:{x:1}});},600);
-          setTimeout(()=>{
+      check() {
+        if (this.p.every(p=>p.ok)) {
+          // КОНФЕТТІ!
+          confetti({particleCount:400, spread:100, origin:{y:0.6}});
+          setTimeout(()=>confetti({particleCount:200, angle:60, spread:80, origin:{x:0}}),300);
+          setTimeout(()=>confetti({particleCount:200, angle:120, spread:80, origin:{x:1}}),600);
+          setTimeout(() => {
             screens.show('win');
-            setTimeout(()=>{currentPuzzle=null;screens.show('hint');},4000);
-          },1500);
+            setTimeout(() => { currentPuzzle = null; screens.show('hint'); }, 4000);
+          }, 1500);
         }
       }
     }
 
-    // === MindAR ===
+    // === Запуск MindAR та маркери ===
     const scene = document.querySelector('a-scene');
-    scene.addEventListener('loaded',()=>scene.components['mindar-image-system'].start());
+    scene.addEventListener('loaded', () => {
+      scene.components['mindar-image-system'].start();
+    });
 
-    PUZZLES.forEach(config=>{
+    PUZZLES.forEach(cfg => {
       const ent = document.createElement('a-entity');
-      ent.setAttribute('mindar-image-target',`targetIndex:${config.id}`);
+      ent.setAttribute('mindar-image-target', `targetIndex:${cfg.id}`);
 
-      ent.addEventListener('targetFound',()=>{
-        document.getElementById('preview').src = `images/${String(config.id+1).padStart(2,'0')}.jpg`;
-        if(currentPuzzle)return;
-        const r = new PuzzleRenderer(document.getElementById('puzzleCanvas'));
-        currentPuzzle = new PuzzleEngine(config,r);
+      ent.addEventListener('targetFound', () => {
+        // Показуємо прев’ю маркера
+        document.getElementById('preview').src = `images/${String(cfg.id + 1).padStart(2, '0')}.jpg`;
+
+        if (currentPuzzle) return; // щоб не створювати багато пазлів
+
+        const renderer = new PuzzleRenderer(document.getElementById('puzzleCanvas'));
+        currentPuzzle = new PuzzleEngine(cfg, renderer);
         screens.show('puzzle');
       });
 
-      ent.addEventListener('targetLost',()=>{
-        if(currentPuzzle){
-          currentPuzzle=null;
+      ent.addEventListener('targetLost', () => {
+        if (currentPuzzle) {
+          currentPuzzle = null;
           screens.show('hint');
         }
       });
@@ -225,21 +242,29 @@
       scene.appendChild(ent);
     });
 
-    document.getElementById('startBtn').onclick=async()=>{
-      if(gameStarted)return;gameStarted=true;
-      try{
-        await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    // === Старт гри ===
+    document.getElementById('startBtn').onclick = async () => {
+      if (started) return;
+      started = true;
+      try {
+        await navigator.mediaDevices.getUserMedia({video: {facingMode: "environment"}});
         screens.show('hint');
-      }catch(e){
-        alert("Дозволь доступ до камери!");
-        gameStarted=false;
+      } catch {
+        alert("Будь ласка, дозволь доступ до камери!");
+        started = false;
+      }
+    }
+    };
+
+    // === Кнопка закриття ===
+    document.getElementById('closeBtn').onclick = () => {
+      if (currentPuzzle) {
+        currentPuzzle = null;
+        screens.show('hint');
       }
     };
 
-    document.getElementById('closeBtn').onclick=()=>{
-      if(currentPuzzle){currentPuzzle=null;screens.show('hint');}
-    };
-
+    // Початковий екран
     screens.show('start');
   </script>
 </body>
