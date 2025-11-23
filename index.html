@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Магічний пазл для зірочки</title>
 
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
@@ -19,37 +18,37 @@
       font-family:'Comic Sans MS',cursive,sans-serif;
       touch-action:none;-webkit-tap-highlight-color:transparent;
     }
-    a-scene{
-      position:fixed !important;inset:0 !important;
-      background:transparent !important;
-    }
-    #puzzleCanvas{
-      position:fixed;inset:0;z-index:100;
-      background:transparent !important;display:none;
-    }
+    a-scene{position:fixed;inset:0;background:transparent !important}
+    #puzzleCanvas{position:fixed;inset:0;z-index:100;background:transparent;display:none}
     #closeBtn{
       position:fixed;top:max(15px,env(safe-area-inset-top,15px));right:15px;
-      width:60px;height:60px;background:#ff1493;color:white;
-      border:none;border-radius:50%;font-size:32px;z-index:101;
-      box-shadow:0 0 30px #ff1493;cursor:pointer;display:none;
+      width:60px;height:60px;background:#ff1493;color:white;border:none;
+      border-radius:50%;font-size:32px;z-index:101;box-shadow:0 0 30px #ff1493;
+      cursor:pointer;display:none;
     }
     .screen{
       position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
       flex-direction:column;color:white;z-index:999;text-align:center;
       background:rgba(0,0,0,0.45);backdrop-filter:blur(12px);padding:20px;
     }
-    #startScreen{
-      background:radial-gradient(circle at center,rgba(255,20,147,0.7),transparent);
-    }
+    #startScreen{background:radial-gradient(circle at center,rgba(255,20,147,0.7),transparent)}
     #winScreen h1{animation:pulse 1.5s infinite}
     @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
     button{
-      background:#ff1493;color:white;border:none;padding:20px 50px;
-      border-radius:50px;font-size:32px;cursor:pointer;
+      background:#ff1493;color:white;border:none;padding:18px 45px;
+      border-radius:50px;font-size:30px;cursor:pointer;
       box-shadow:0 0 50px #ff1493;margin:15px;transition:.3s;
     }
-    button:hover{transform:scale(1.08)}
     button:active{transform:scale(0.95)}
+
+    /* Новий блок — спеціально під маленькі екрани (Huawei, Samsung A тощо) */
+    #hintTextOnPuzzle{
+      position:fixed;top:10px;left:10px;right:10px;
+      color:white;font-weight:bold;text-align:center;z-index:102;
+      font-size:clamp(18px, 4vw, 26px); /* ← головне: текст завжди влізе */
+      text-shadow:2px 2px 8px rgba(0,0,0,0.8);
+      pointer-events:none;display:none;
+    }
   </style>
 </head>
 <body>
@@ -57,25 +56,25 @@
   <canvas id="puzzleCanvas"></canvas>
   <button id="closeBtn">X</button>
 
-  <!-- Старт -->
+  <!-- Текст-підказка тепер окремо (не на canvas) -->
+  <div id="hintTextOnPuzzle">Перетягуй шматочки пальчиком!</div>
+
   <div id="startScreen" class="screen">
-    <h1 style="font-size:52px;margin:0">Магічний пазл</h1>
-    <p style="font-size:28px;margin:20px 0 30px">12 чарівних картинок для тебе</p>
+    <h1 style="font-size:clamp(42px,9vw,56px);margin:0">Магічний пазл</h1>
+    <p style="font-size:clamp(24px,6vw,32px);margin:20px 0 30px">12 чарівних картинок для тебе</p>
     <button id="startBtn">ПОЧАТИ МАГІЮ!</button>
   </div>
 
-  <!-- Загальна підказка — без конкретного зображення -->
   <div id="hintScreen" class="screen" style="display:none">
-    <h2 style="font-size:42px;margin-bottom:20px">Знайди будь-яку картинку з календаря!</h2>
-    <p style="font-size:32px;line-height:1.4">
+    <h2 style="font-size:clamp(36px,9vw,48px);margin-bottom:20px">Знайди будь-яку картинку з календаря!</h2>
+    <p style="font-size:clamp(26px,7vw,36px);line-height:1.4">
       Покажи її камері —<br>і з’явиться чарівний пазл
     </p>
   </div>
 
-  <!-- Перемога -->
   <div id="winScreen" class="screen" style="display:none">
-    <h1 style="font-size:56px;margin:10px">УРАААА!</h1>
-    <p style="font-size:36px">Ти — найкраща чарівниця!</p>
+    <h1 style="font-size:clamp(48px,11vw,68px);margin:10px">УРАААА!</h1>
+    <p style="font-size:clamp(30px,8vw,42px)">Ти — найкраща чарівниця!</p>
   </div>
 
   <a-scene embedded
@@ -89,19 +88,10 @@
   </a-scene>
 
   <script>
-    const PUZZLES = Array.from({length:12},(_,i)=>({
-      id:i,
-      image:`images/${String(i+1).padStart(2,'0')}.jpg`
-    }));
+    const PUZZLES = Array.from({length:12},(_,i)=>({id:i,image:`images/${String(i+1).padStart(2,'0')}.jpg`}));
 
-    let currentPuzzle = null;
-    let started = false;
-    let completed = new Set();
-
-    // localStorage — зберігаємо прогрес
-    if(localStorage.getItem('completed')){
-      try{completed = new Set(JSON.parse(localStorage.getItem('completed')))}catch{}
-    }
+    let currentPuzzle=null, started=false;
+    const completed = localStorage.getItem('completed') ? new Set(JSON.parse(localStorage.getItem('completed'))) : new Set();
     window.addEventListener('beforeunload',()=>localStorage.setItem('completed',JSON.stringify([...completed])));
 
     const screens = {
@@ -109,16 +99,16 @@
         ['start','hint','win'].forEach(s=>document.getElementById(s+'Screen').style.display='none');
         document.getElementById('puzzleCanvas').style.display='none';
         document.getElementById('closeBtn').style.display='none';
+        document.getElementById('hintTextOnPuzzle').style.display='none';
         if(name==='puzzle'){
           document.getElementById('puzzleCanvas').style.display='block';
           document.getElementById('closeBtn').style.display='block';
+          document.getElementById('hintTextOnPuzzle').style.display='block';
         } else {
           document.getElementById(name+'Screen').style.display='flex';
         }
       }
     };
-
-    const loadImage = src => new Promise((res,rej)=>{const i=new Image();i.crossOrigin="anonymous";i.onload=()=>res(i);i.onerror=rej;i.src=src});
 
     class PuzzleRenderer{
       constructor(c){this.c=c;this.ctx=c.getContext('2d',{alpha:true});this.resize();addEventListener('resize',()=>this.resize())}
@@ -131,32 +121,29 @@
         const w=cell, h=cell*(p[0].height/p[0].width||1);
         const totalW=w*3, totalH=h*3;
         const cx=(innerWidth-totalW)/2, cy=(innerHeight-totalH)/2;
+
+        // Жовта рамка
         this.ctx.strokeStyle='gold';this.ctx.lineWidth=8;
         this.ctx.strokeRect(cx-15,cy-15,totalW+30,totalH+30);
+
+        // Шматочки БЕЗ тіней (бо на Huawei дратують)
         p.forEach(piece=>{
-          this.ctx.shadowColor="rgba(0,0,0,0.6)";this.ctx.shadowBlur=20;
-          this.ctx.shadowOffsetX=8;this.ctx.shadowOffsetY=12;
           this.ctx.drawImage(piece.image,piece.x,piece.y,w,h);
-          this.ctx.shadowColor="transparent";
           if(piece===dragged){
             this.ctx.strokeStyle='#ff1493';this.ctx.lineWidth=6;
             this.ctx.strokeRect(piece.x,piece.y,w,h);
           }
         });
-        this.ctx.fillStyle='rgba(255,255,255,0.95)';
-        this.ctx.font='bold 28px "Comic Sans MS"';
-        this.ctx.textAlign='center';
-        this.ctx.fillText('Перетягуй шматочки пальчиком!',innerWidth/2,70);
       }
     }
 
     class PuzzleEngine{
       constructor(cfg,rend){this.cfg=cfg;this.rend=rend;this.p=[];this.drag=null;this.off={x:0,y:0};this.init()}
       async init(){
-        try{await this.makePieces(await loadImage(this.cfg.image))}catch{this.fallback()}
-        this.events();this.rend.render(this.p)
+        const img = await new Promise((res,rej)=>{const i=new Image();i.crossOrigin="anonymous";i.onload=()=>res(i);i.onerror=rej;i.src=this.cfg.image});
+        this.makePieces(img);this.events();this.rend.render(this.p);
       }
-      async makePieces(img){
+      makePieces(img){
         const maxSize = Math.min(innerWidth*0.92, innerHeight*0.68);
         const cell = maxSize/3;
         const sz = cell, ph = cell*(img.height/img.width);
@@ -166,30 +153,12 @@
         for(let r=0;r<3;r++)for(let c=0;c<3;c++){
           const cv=document.createElement('canvas');cv.width=sw;cv.height=sh;
           cv.getContext('2d').drawImage(img,c*sw,r*sh,sw,sh,0,0,sw,sh);
-          const i=new Image();i.src=cv.toDataURL();await new Promise(res=>i.onload=res);
+          const i=new Image();i.src=cv.toDataURL();
           this.p.push({image:i,width:sz,height:ph,
             x:ox+Math.random()*(innerWidth-sz*2),y:oy+Math.random()*(innerHeight-ph*2),
             tx:ox+c*sz,ty:oy+r*ph,ok:false})
         }
         this.shuffle();
-      }
-      fallback(){
-        const cols=['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#98D8C8','#F7DC6F','#BB8FCE'];
-        const s = Math.min(innerWidth,innerHeight)*0.2;
-        for(let i=0;i<9;i++){
-          const cv=document.createElement('canvas');cv.width=cv.height=s;
-          const ctx=cv.getContext('2d');
-          ctx.fillStyle=cols[i];ctx.fillRect(0,0,s,s);
-          ctx.fillStyle='white';ctx.font='bold 48px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
-          ctx.fillText(i+1,s/2,s/2);
-          const img=new Image();img.src=cv.toDataURL();
-          const row=Math.floor(i/3),col=i%3;
-          const total = s*3;
-          const ox=(innerWidth-total)/2, oy=(innerHeight-total)/2;
-          this.p.push({image:img,width:s,height:s,
-            x:ox+Math.random()*(innerWidth-s*2),y:oy+Math.random()*(innerHeight-s*2),
-            tx:ox+col*s,ty:oy+row*s,ok:false})
-        }
       }
       shuffle(){for(let i=this.p.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[this.p[i],this.p[j]]=[this.p[j],this.p[i]]}}
       events(){
@@ -219,27 +188,19 @@
       }
     }
 
-    // === Запуск ===
     document.getElementById('startBtn').onclick = async () => {
       if(started) return; started = true;
       try {
         await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
         document.querySelector('a-scene').systems['mindar-image-system'].start();
-        screens.show('hint'); // одразу загальна підказка
-      } catch(e){
-        alert("Дозволь доступ до камери!");
-        started = false;
-      }
+        screens.show('hint');
+      } catch(e){alert("Дозволь доступ до камери!");started=false}
     };
 
     document.getElementById('closeBtn').onclick = () => {
-      if(currentPuzzle){
-        currentPuzzle = null;
-        screens.show('hint');
-      }
+      currentPuzzle=null;screens.show('hint');
     };
 
-    // === Маркери ===
     document.querySelector('a-scene').addEventListener('loaded', () => {
       PUZZLES.forEach(cfg => {
         const ent = document.createElement('a-entity');
