@@ -7,7 +7,7 @@
   <title>Магічний пазл для зірочки</title>
 
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aface.prod.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 
   <style>
@@ -34,29 +34,17 @@
     #startScreen{background:radial-gradient(circle at center,rgba(255,20,147,0.7),transparent)}
     #winScreen h1{animation:pulse 1.5s infinite}
     @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
-    button{
-      background:#ff1493;color:white;border:none;padding:18px 45px;
-      border-radius:50px;font-size:30px;cursor:pointer;
-      box-shadow:0 0 50px #ff1493;margin:15px;transition:.3s;
-    }
+    button{background:#ff1493;color:white;border:none;padding:18px 45px;border-radius:50px;font-size:30px;cursor:pointer;box-shadow:0 0 50px #ff1493;margin:15px;transition:.3s}
     button:active{transform:scale(0.95)}
-
-    /* Новий блок — спеціально під маленькі екрани (Huawei, Samsung A тощо) */
     #hintTextOnPuzzle{
-      position:fixed;top:10px;left:10px;right:10px;
-      color:white;font-weight:bold;text-align:center;z-index:102;
-      font-size:clamp(18px, 4vw, 26px); /* ← головне: текст завжди влізе */
-      text-shadow:2px 2px 8px rgba(0,0,0,0.8);
-      pointer-events:none;display:none;
+      position:fixed;top:10px;left:10px;right:10px;color:white;font-weight:bold;text-align:center;z-index:102;
+      font-size:clamp(18px,4vw,26px);text-shadow:2px 2px 8px rgba(0,0,0,0.8);pointer-events:none;display:none;
     }
   </style>
 </head>
 <body>
-
   <canvas id="puzzleCanvas"></canvas>
   <button id="closeBtn">X</button>
-
-  <!-- Текст-підказка тепер окремо (не на canvas) -->
   <div id="hintTextOnPuzzle">Перетягуй шматочки пальчиком!</div>
 
   <div id="startScreen" class="screen">
@@ -89,8 +77,9 @@
 
   <script>
     const PUZZLES = Array.from({length:12},(_,i)=>({id:i,image:`images/${String(i+1).padStart(2,'0')}.jpg`}));
+    let currentPuzzle = null, started = false;
+    const mindarSystem = null; // збережемо посилання на систему
 
-    let currentPuzzle=null, started=false;
     const completed = localStorage.getItem('completed') ? new Set(JSON.parse(localStorage.getItem('completed'))) : new Set();
     window.addEventListener('beforeunload',()=>localStorage.setItem('completed',JSON.stringify([...completed])));
 
@@ -100,6 +89,7 @@
         document.getElementById('puzzleCanvas').style.display='none';
         document.getElementById('closeBtn').style.display='none';
         document.getElementById('hintTextOnPuzzle').style.display='none';
+
         if(name==='puzzle'){
           document.getElementById('puzzleCanvas').style.display='block';
           document.getElementById('closeBtn').style.display='block';
@@ -121,12 +111,8 @@
         const w=cell, h=cell*(p[0].height/p[0].width||1);
         const totalW=w*3, totalH=h*3;
         const cx=(innerWidth-totalW)/2, cy=(innerHeight-totalH)/2;
-
-        // Жовта рамка
         this.ctx.strokeStyle='gold';this.ctx.lineWidth=8;
         this.ctx.strokeRect(cx-15,cy-15,totalW+30,totalH+30);
-
-        // Шматочки БЕЗ тіней (бо на Huawei дратують)
         p.forEach(piece=>{
           this.ctx.drawImage(piece.image,piece.x,piece.y,w,h);
           if(piece===dragged){
@@ -183,24 +169,45 @@
         if(this.p.every(p=>p.ok)){
           completed.add(this.cfg.id);
           confetti({particleCount:500,spread:110,origin:{y:0.6}});
-          setTimeout(()=>{screens.show('win');setTimeout(()=>{currentPuzzle=null;screens.show('hint')},4000)},1500);
+          setTimeout(()=>{
+            screens.show('win');
+            setTimeout(()=>{
+              currentPuzzle = null;
+              screens.show('hint');
+              // КРИТИЧНО ДЛЯ iOS: перезапускаємо трекінг!
+              const system = document.querySelector('a-scene').systems['mindar-image-system'];
+              system.stop();
+              setTimeout(()=>system.start(), 100);
+            },4000);
+          },1500);
         }
       }
     }
 
+    // Запуск
     document.getElementById('startBtn').onclick = async () => {
       if(started) return; started = true;
       try {
         await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
-        document.querySelector('a-scene').systems['mindar-image-system'].start();
+        const scene = document.querySelector('a-scene');
+        scene.systems['mindar-image-system'].start();
         screens.show('hint');
-      } catch(e){alert("Дозволь доступ до камери!");started=false}
+      } catch(e){
+        alert("Дозволь доступ до камери!");
+        started = false;
+      }
     };
 
+    // Кнопка X — теж перезапускаємо трекінг!
     document.getElementById('closeBtn').onclick = () => {
-      currentPuzzle=null;screens.show('hint');
+      currentPuzzle = null;
+      screens.show('hint');
+      const system = document.querySelector('a-scene').systems['mindar-image-system'];
+      system.stop();
+      setTimeout(()=>system.start(), 100);
     };
 
+    // Додаємо маркери
     document.querySelector('a-scene').addEventListener('loaded', () => {
       PUZZLES.forEach(cfg => {
         const ent = document.createElement('a-entity');
